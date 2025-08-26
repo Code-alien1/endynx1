@@ -1,0 +1,157 @@
+// styles/auth.styles.ts
+import { StyleSheet } from 'react-native';
+
+export const styles = StyleSheet.create({
+  scrollView: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  container: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    flexGrow: 1,
+  },
+  logoContainer: {
+    marginBottom: 40,
+  },
+  loginContainer: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 20,
+    padding: 30,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  loginTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  loginSubtitle: {
+    fontSize: 16,
+    color: 'hsl(200, 10%, 70%)',
+    marginBottom: 30,
+    textAlign: 'center',
+  },
+  faceIdButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'hsl(154, 86%, 47%)',
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 12,
+    marginBottom: 20,
+    shadowColor: 'hsl(154, 86%, 47%)',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  faceIdText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 10,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginVertical: 20,
+  },
+  line: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'hsl(200, 10%, 30%)',
+  },
+  orText: {
+    color: 'hsl(200, 10%, 70%)',
+    fontSize: 14,
+    marginHorizontal: 15,
+  },
+  inputContainer: {
+    width: '100%',
+    marginBottom: 15,
+    position: 'relative',
+  },
+  inputIcon: {
+    position: 'absolute',
+    left: 15,
+    top: 15,
+    zIndex: 1,
+  },
+  input: {
+    width: '100%',
+    backgroundColor: 'hsl(200, 40%, 15%)',
+    borderRadius: 12,
+    paddingVertical: 15,
+    paddingHorizontal: 45,
+    fontSize: 16,
+    color: '#fff',
+    borderWidth: 1,
+    borderColor: 'hsl(200, 30%, 25%)',
+  },
+  passwordContainer: {
+    width: '100%',
+    marginBottom: 20,
+    position: 'relative',
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: 15,
+    top: 15,
+    zIndex: 1,
+  },
+  signInButton: {
+    width: '100%',
+    backgroundColor: '#2ecc71', // Green color to match theme
+    paddingVertical: 15,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#2ecc71',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  disabledButton: {
+    backgroundColor: 'hsl(200, 10%, 30%)',
+    opacity: 0.6,
+  },
+  signInText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  signingText: {
+    color: 'hsl(154, 86%, 47%)',
+    fontSize: 14,
+    textDecorationLine: 'underline',
+  },
+  footerText: {
+    position: 'absolute',
+    bottom: 30,
+    color: 'hsl(200, 10%, 50%)',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+});

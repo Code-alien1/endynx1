@@ -1,0 +1,64 @@
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Roboto:wght@300;400;500;700&display=swap');
+
+:root {
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  margin: auto;
+}
+
+/* Theme CSS Variables */
+:root {
+  /* Brand Colors */
+  --color-primary: hsl(154, 86%, 47%);
+  --color-primary-foreground: hsl(0, 0%, 100%);
+  --color-primary-glow: hsl(154, 86%, 65%);
+  --color-secondary: hsl(193, 100%, 46%);
+  --color-secondary-foreground: hsl(0, 0%, 100%);
+  --color-secondary-glow: hsl(193, 100%, 65%);
+  --color-accent: hsl(200, 14%, 77%);
+  --color-accent-foreground: hsl(220, 13%, 18%);
+  
+  /* Background System */
+  --color-background: hsl(198, 100%, 7%);
+  --color-background-secondary: hsl(220, 100%, 4%);
+  --color-foreground: hsl(0, 0%, 98%);
+  
+  /* Card */
+  --color-card: hsl(200, 50%, 12%);
+  --color-card-foreground: hsl(0, 0%, 98%);
+  --color-card-border: hsl(200, 30%, 20%);
+  
+  /* States */
+  --color-border: hsl(200, 30%, 25%);
+  --color-muted: hsl(200, 30%, 20%);
+  --color-muted-foreground: hsl(200, 10%, 70%);
+  --color-destructive: hsl(0, 84%, 60%);
+  --color-destructive-foreground: hsl(0, 0%, 98%);
+  
+  /* Border Radius */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  
+  /* Fonts */
+  --font-orbitron: 'Orbitron', monospace;
+  --font-roboto: 'Roboto', sans-serif;
+}
+
+/* Global styles for React Native Web compatibility */
+body {
+  font-family: var(--font-roboto);
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  margin: 0;
+  padding: 0;
+}
+
+/* IMPORTANT: Do not add any CSS reset rules to this file. */
