@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useAuth } from '../contexts/AuthContext';
 import EdynxLogo from '../components/edynxLogo';
 import DottedGridBackground from '../components/DottedGridBackground';
 
@@ -16,6 +17,18 @@ const { width, height } = Dimensions.get('window');
 
 export default function LandingPage() {
   const router = useRouter();
+  const { isAuthenticated, isLoading, getRoleRoute } = useAuth();
+
+  useEffect(() => {
+    console.log('Landing page - Auth state:', { isLoading, isAuthenticated });
+    if (!isLoading && isAuthenticated) {
+      const target = getRoleRoute();
+      console.log('Redirecting authenticated user to:', target);
+      router.replace(target);
+    } else if (!isLoading && !isAuthenticated) {
+      console.log('User not authenticated, staying on landing page');
+    }
+  }, [isAuthenticated, isLoading, router, getRoleRoute]);
 
   const handleGetStarted = () => {
     router.push('/(auth)/login');

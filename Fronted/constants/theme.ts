@@ -28,6 +28,14 @@ export const COLORS = {
   "muted-foreground": "hsl(200, 10%, 70%)",
   destructive: "hsl(0, 84%, 60%)",
   "destructive-foreground": "hsl(0, 0%, 98%)",
+  
+  // Additional semantic colors for dashboards
+  success: "hsl(120, 60%, 50%)", // Green
+  warning: "hsl(45, 100%, 60%)", // Orange/Yellow
+  info: "hsl(200, 100%, 60%)", // Blue
+  error: "hsl(0, 84%, 60%)", // Red (same as destructive)
+  text: "hsl(0, 0%, 98%)", // Main text color
+  textSecondary: "hsl(200, 10%, 70%)", // Secondary text color
 } as const;
 
 // Theme object for new components

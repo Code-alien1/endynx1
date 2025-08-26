@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { View, Text } from 'react-native';
 
 export default function TabsIndex() {
@@ -9,8 +9,8 @@ export default function TabsIndex() {
 
   useEffect(() => {
     if (user) {
-      // Only redirect to setting for fallback, let other roles use their designated routes
-      router.replace('/(tabs)/setting');
+      // All roles redirect to settings since other tabs were removed
+      router.replace('/(tabs)/setting' as any);
     }
   }, [user, router]);
 

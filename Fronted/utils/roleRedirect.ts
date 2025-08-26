@@ -1,9 +1,24 @@
 import { User } from '../services/api';
+import type { Href } from 'expo-router';
 
-export const getRoleBasedRoute = (user: User): string => {
-  // For now, all roles redirect to the same tabs structure
-  // but we can customize the dashboard content based on role
-  return '/(tabs)';
+export const getRoleBasedRoute = (user: User): Href => {
+  // Route users to their role-specific dashboards
+  switch (user.role) {
+    case 'student':
+      return '/(dashboards)/student' as Href;
+    case 'teacher':
+      return '/(dashboards)/teacher' as Href;
+    case 'parent':
+      return '/(dashboards)/parent' as Href;
+    case 'mentor':
+      return '/(dashboards)/mentor' as Href;
+    case 'administration':
+      return '/(dashboards)/administration' as Href;
+    case 'superadmin':
+      return '/(dashboards)/superadmin' as Href;
+    default:
+      return '/(tabs)/setting' as Href;
+  }
 };
 
 export const getRoleDashboardTitle = (role: string): string => {

@@ -10,19 +10,33 @@ const resolveApiBaseUrl = (): string => {
     // Normalize: remove trailing slash
     return envUrl.replace(/\/$/, '');
   }
+  
+  // For development, use your computer's IP address
+  // This allows the mobile app to connect to your Django server
+  const developmentIPs = [
+    'http://192.168.33.107:8000/api',  // Your current network IP
+    'http://192.168.2.33:8000/api',    // Alternative network IP
+    'http://127.0.0.1:8000/api',       // Localhost fallback
+  ];
+  
   // Try to infer host from Expo
   const hostUri = (Constants as any)?.expoConfig?.hostUri || (Constants as any)?.manifest?.debuggerHost;
   if (hostUri) {
     const host = String(hostUri).split(':')[0];
     return `http://${host}:8000/api`;
   }
-  // Emulators/simulators defaults
+  
+  // Platform-specific defaults
   if (Platform.OS === 'android') {
     // Android emulator maps host loopback to 10.0.2.2
     return 'http://10.0.2.2:8000/api';
+  } else if (Platform.OS === 'web') {
+    // Web can use localhost
+    return 'http://localhost:8000/api';
   }
-  // iOS simulator and web fallback
-  return 'http://localhost:8000/api';
+  
+  // For physical devices, use the first development IP
+  return developmentIPs[0];
 };
 const API_BASE_URL = resolveApiBaseUrl();
 const TOKEN_KEY = 'auth_token';
@@ -46,12 +60,16 @@ export interface User {
   rating?: number;
   total_ratings?: number;
   profile_picture?: string;
+  subject_taught?: string;
+  department?: string;
+  position?: string;
   created_at: string;
 }
 
 export interface LoginCredentials {
   email: string;
   password: string;
+  role?: string;
 }
 
 export interface RegisterData {
@@ -146,11 +164,13 @@ class ApiService {
   constructor() {
     this.api = axios.create({
       baseURL: API_BASE_URL,
-      timeout: 15000,
+      timeout: 30000, // Increased timeout to 30 seconds
       headers: {
         'Content-Type': 'application/json',
       },
     });
+
+    console.log('API Base URL:', API_BASE_URL); // Debug log
 
     // Request interceptor to add auth token
     this.api.interceptors.request.use(
@@ -166,35 +186,15 @@ class ApiService {
       }
     );
 
-    // Response interceptor to handle token refresh
+    // Response interceptor - simplified without automatic refresh
     this.api.interceptors.response.use(
       (response) => response,
       async (error) => {
-        const originalRequest = error.config;
-
-        if (error.response?.status === 401 && !originalRequest._retry) {
-          originalRequest._retry = true;
-
-          try {
-            const refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
-            if (refreshToken) {
-              const response = await this.api.post('/token/refresh/', {
-              refresh: refreshToken,
-              });
-
-              const { access } = response.data;
-              await AsyncStorage.setItem(TOKEN_KEY, access);
-
-              originalRequest.headers.Authorization = `Bearer ${access}`;
-              return this.api(originalRequest);
-            }
-          } catch (refreshError) {
-            // Refresh token failed, redirect to login
-            await this.logout();
-            throw refreshError;
-          }
+        // If 401, just clear tokens and let user login again
+        if (error.response?.status === 401) {
+          await AsyncStorage.removeItem(TOKEN_KEY);
+          await AsyncStorage.removeItem(REFRESH_TOKEN_KEY);
         }
-
         return Promise.reject(error);
       }
     );
@@ -466,7 +466,20 @@ class ApiService {
   // Utility Methods
   async isAuthenticated(): Promise<boolean> {
     const token = await AsyncStorage.getItem(TOKEN_KEY);
-    return !!token;
+    if (!token) {
+      return false;
+    }
+    
+    try {
+      // Verify token is valid by making a request to get current user
+      await this.api.get('/users/profile/');
+      return true;
+    } catch (error) {
+      // Token is invalid, clear it
+      await AsyncStorage.removeItem(TOKEN_KEY);
+      await AsyncStorage.removeItem(REFRESH_TOKEN_KEY);
+      return false;
+    }
   }
 
   async getStoredToken(): Promise<string | null> {

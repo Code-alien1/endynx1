@@ -133,12 +133,15 @@ class RoleBasedAccessMiddleware(MiddlewareMixin):
     
     # Define role requirements for specific endpoints
     ROLE_REQUIREMENTS = {
-        '/api/users/': ['administration', 'superadmin'],
+        # Administration-only sections
         '/api/admin/': ['administration', 'superadmin'],
+        # Specific privileged actions (keep narrow to avoid blocking general user endpoints)
         '/api/attendance/sessions/create/': ['teacher', 'administration', 'superadmin'],
         '/api/attendance/manage/': ['teacher', 'administration', 'superadmin'],
         '/api/mentors/assign/': ['administration', 'superadmin'],
         '/api/reports/': ['teacher', 'mentor', 'parent', 'administration', 'superadmin'],
+        # Example: user management screens could live under this path if added later
+        '/api/users/administration/': ['administration', 'superadmin'],
     }
     
     def process_request(self, request):

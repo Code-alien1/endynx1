@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { Alert } from 'react-native';
 import apiService, { User, LoginCredentials, RegisterData } from '../services/api';
 import { getRoleBasedRoute } from '../utils/roleRedirect';
+import type { Href } from 'expo-router';
 
 interface AuthContextType {
   user: User | null;
@@ -12,7 +13,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   updateUser: (userData: Partial<User>) => Promise<void>;
   refreshUser: () => Promise<void>;
-  getRoleRoute: () => string;
+  getRoleRoute: () => Href;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -35,10 +36,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (isAuth) {
         const currentUser = await apiService.getCurrentUser();
         setUser(currentUser);
+      } else {
+        // Ensure user is null if not authenticated
+        setUser(null);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
-      // Clear any invalid tokens
+      // Clear any invalid tokens and user state
+      setUser(null);
       await apiService.logout();
     } finally {
       setIsLoading(false);
@@ -128,8 +133,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const getRoleRoute = (): string => {
-    if (!user) return '/(tabs)';
+  const getRoleRoute = (): Href => {
+    if (!user) return '/(auth)/login' as Href;
     return getRoleBasedRoute(user);
   };
 

@@ -20,7 +20,7 @@ class UserAdmin(BaseUserAdmin):
     
     fieldsets = (
         (None, {'fields': ('email', 'password')}),
-        ('Personal info', {'fields': ('first_name', 'last_name', 'phone_number', 'date_of_birth', 'address', 'profile_picture')}),
+        ('Personal info', {'fields': ('username', 'first_name', 'last_name', 'phone_number', 'date_of_birth', 'address', 'profile_picture')}),
         ('Role Information', {'fields': ('role', 'level', 'class_name')}),
         ('Student Info', {'fields': ('student_id', 'parent'), 'classes': ('collapse',)}),
         ('Teacher Info', {'fields': ('teacher_id', 'subject_taught', 'department'), 'classes': ('collapse',)}),
@@ -34,7 +34,7 @@ class UserAdmin(BaseUserAdmin):
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('email', 'password1', 'password2', 'role'),
+            'fields': ('email', 'username', 'password1', 'password2', 'role'),
         }),
     )
     

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { COLORS } from '../constants/theme';
@@ -21,7 +21,7 @@ const roleOptions: RoleOption[] = [
     value: 'teacher',
     label: 'Teacher',
     description: 'Manage classes, track attendance, and guide students',
-    icon: 'teach'
+    icon: 'account-tie'
   },
   {
     value: 'mentor',
@@ -40,7 +40,8 @@ const roleOptions: RoleOption[] = [
     label: 'Administrator',
     description: 'Manage school operations and system settings',
     icon: 'shield-account'
-  }
+  },
+  
 ];
 
 interface RoleSelectorProps {
@@ -49,43 +50,78 @@ interface RoleSelectorProps {
 }
 
 export default function RoleSelector({ selectedRole, onRoleSelect }: RoleSelectorProps) {
+  const [open, setOpen] = useState(false);
+  const current = roleOptions.find(r => r.value === selectedRole) || roleOptions[0];
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Select Your Role</Text>
       <Text style={styles.subtitle}>Choose the role that best describes you</Text>
-      
-      <View style={styles.rolesContainer}>
-        {roleOptions.map((role) => (
-          <TouchableOpacity
-            key={role.value}
-            style={[
-              styles.roleOption,
-              selectedRole === role.value && styles.selectedRole
-            ]}
-            onPress={() => onRoleSelect(role.value)}
-          >
-            <View style={styles.roleHeader}>
-              <MaterialCommunityIcons
-                name={role.icon as any}
-                size={24}
-                color={selectedRole === role.value ? COLORS.primary : COLORS['muted-foreground']}
-              />
-              <Text style={[
-                styles.roleLabel,
-                selectedRole === role.value && styles.selectedRoleLabel
-              ]}>
-                {role.label}
-              </Text>
-            </View>
-            <Text style={[
-              styles.roleDescription,
-              selectedRole === role.value && styles.selectedRoleDescription
-            ]}>
-              {role.description}
+
+      {/* Dropdown trigger */}
+      <TouchableOpacity
+        style={styles.dropdown}
+        onPress={() => setOpen(o => !o)}
+        activeOpacity={0.8}
+      >
+        <View style={styles.selectedRow}>
+          <MaterialCommunityIcons
+            name={current.icon as any}
+            size={22}
+            color={COLORS.primary}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.selectedLabel}>{current.label}</Text>
+            <Text style={styles.selectedDescription} numberOfLines={1}>
+              {current.description}
             </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+          </View>
+          <MaterialCommunityIcons
+            name={open ? 'chevron-up' : 'chevron-down'}
+            size={22}
+            color={COLORS['muted-foreground']}
+          />
+        </View>
+      </TouchableOpacity>
+
+      {/* Options list */}
+      {open && (
+        <View style={styles.optionsPanel}>
+          {roleOptions.map((role) => {
+            const isActive = selectedRole === role.value;
+            return (
+              <TouchableOpacity
+                key={role.value}
+                style={[styles.optionRow, isActive && styles.optionRowActive]}
+                onPress={() => {
+                  onRoleSelect(role.value);
+                  setOpen(false);
+                }}
+              >
+                <MaterialCommunityIcons
+                  name={role.icon as any}
+                  size={20}
+                  color={isActive ? COLORS.primary : COLORS['muted-foreground']}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.optionLabel, isActive && styles.optionLabelActive]}>
+                    {role.label}
+                  </Text>
+                  <Text
+                    style={[styles.optionDescription, isActive && styles.optionDescriptionActive]}
+                    numberOfLines={1}
+                  >
+                    {role.description}
+                  </Text>
+                </View>
+                {isActive && (
+                  <MaterialCommunityIcons name="check" size={18} color={COLORS.primary} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
     </View>
   );
 }
@@ -107,40 +143,61 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
   },
-  rolesContainer: {
-    gap: 12,
-  },
-  roleOption: {
+  dropdown: {
     backgroundColor: COLORS.card,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: 12,
-    padding: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
-  selectedRole: {
-    borderColor: COLORS.primary,
-    backgroundColor: 'rgba(46, 204, 113, 0.05)',
-  },
-  roleHeader: {
+  selectedRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    gap: 12,
   },
-  roleLabel: {
+  selectedLabel: {
     fontSize: 16,
     fontWeight: '600',
     color: COLORS.foreground,
-    marginLeft: 12,
   },
-  selectedRoleLabel: {
+  selectedDescription: {
+    fontSize: 12,
+    color: COLORS['muted-foreground'],
+  },
+  optionsPanel: {
+    marginTop: 8,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  optionRowActive: {
+    backgroundColor: 'rgba(46, 204, 113, 0.05)',
+  },
+  optionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.foreground,
+  },
+  optionLabelActive: {
     color: COLORS.primary,
   },
-  roleDescription: {
-    fontSize: 14,
+  optionDescription: {
+    fontSize: 12,
     color: COLORS['muted-foreground'],
-    lineHeight: 20,
   },
-  selectedRoleDescription: {
+  optionDescriptionActive: {
     color: COLORS.foreground,
   },
 });

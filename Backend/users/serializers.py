@@ -192,10 +192,12 @@ class UserLoginSerializer(serializers.Serializer):
     """Serializer for user login"""
     email = serializers.EmailField()
     password = serializers.CharField()
+    role = serializers.CharField(required=False)
     
     def validate(self, attrs):
         email = attrs.get('email')
         password = attrs.get('password')
+        role = attrs.get('role')
         
         if email and password:
             user = authenticate(username=email, password=password)
@@ -203,6 +205,11 @@ class UserLoginSerializer(serializers.Serializer):
                 raise serializers.ValidationError('Invalid email or password')
             if not user.is_active:
                 raise serializers.ValidationError('User account is disabled')
+            
+            # Validate role if provided
+            if role and user.role != role:
+                raise serializers.ValidationError(f'User role mismatch. Expected {role}, but user is {user.role}')
+            
             attrs['user'] = user
         else:
             raise serializers.ValidationError('Must include email and password')

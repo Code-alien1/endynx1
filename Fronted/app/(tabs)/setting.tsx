@@ -6,6 +6,8 @@ import {
   TouchableOpacity, 
   Alert 
 } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useAuth } from '../../contexts/AuthContext';
 import { settingsStyles } from '../../styles/settings.styles';
 import { mockRootProps, UserProfile, UserPreferences } from '../../data/settingsMockData';
 
@@ -21,6 +23,8 @@ import ActionButton from '../../components/settings/ActionButton';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function Setting() {
+  const router = useRouter();
+  const { logout } = useAuth();
   const [userProfile, setUserProfile] = useState<UserProfile>(mockRootProps.user);
   const [preferences, setPreferences] = useState<UserPreferences>(mockRootProps.preferences);
   const [isProfileChanged, setIsProfileChanged] = useState(false);
@@ -50,9 +54,14 @@ export default function Setting() {
       'Are you sure you want to sign out?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign Out', style: 'destructive', onPress: () => {
-          // Handle sign out logic
-          console.log('User signed out');
+        { text: 'Sign Out', style: 'destructive', onPress: async () => {
+          try {
+            await logout();
+            router.replace('/');
+          } catch (error) {
+            console.error('Logout error:', error);
+            Alert.alert('Error', 'Failed to sign out. Please try again.');
+          }
         }}
       ]
     );

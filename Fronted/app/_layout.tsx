@@ -9,15 +9,7 @@ function AppContent() {
   const { isAuthenticated, isLoading, getRoleRoute } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    if (!isLoading) {
-      if (isAuthenticated) {
-        router.replace('/(tabs)');
-      } else {
-        router.replace('/');
-      }
-    }
-  }, [isAuthenticated, isLoading, router]);
+  // Remove automatic redirect - let index.tsx handle it
 
   if (isLoading) {
     return (
@@ -32,9 +24,10 @@ function AppContent() {
     <SafeAreaProvider>
       <SafeAreaView style={{ flex: 1, backgroundColor: '#0d1e1e' }}>
         <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="screens" options={{ headerShown: false }} />
         </Stack>
       </SafeAreaView>
     </SafeAreaProvider>
