@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .temp_views import TempFaceRecognitionAttendanceView
 
 app_name = 'attendance'
 
@@ -18,6 +19,9 @@ urlpatterns = [
     
     # Face Recognition Attendance
     path('face-recognition/', views.FaceRecognitionAttendanceView.as_view(), name='face-recognition-attendance'),
+    
+    # Temporary endpoint for testing
+    path('temp-face-recognition/', TempFaceRecognitionAttendanceView.as_view(), name='temp-face-recognition'),
     
     # QR Code Attendance
     path('qr-attendance/', views.QRCodeAttendanceView.as_view(), name='qr-attendance'),
@@ -39,4 +43,7 @@ urlpatterns = [
     
     # Role-based attendance endpoints
     path('role-based/', views.RoleBasedAttendanceView.as_view(), name='role-based-attendance'),
+    
+    # Predefined classes for dropdowns
+    path('predefined-classes/', views.PredefinedClassesView.as_view(), name='predefined-classes'),
 ]

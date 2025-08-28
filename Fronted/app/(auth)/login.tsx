@@ -171,8 +171,9 @@ export default function LoginScreen() {
 
 
           </View>
-          </ScrollView>
+          
           <Text style={styles.footerText}>Secure • Modern • Efficient</Text>
+          </ScrollView>
         </DottedGridBackground>
       </KeyboardAvoidingView>
 

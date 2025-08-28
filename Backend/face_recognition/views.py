@@ -321,3 +321,109 @@ def face_attendance_endpoint(request):
             'success': False,
             'error': 'Internal server error'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def face_registration_endpoint(request):
+    """
+    Face registration endpoint for students
+    
+    POST /api/face-recognition/register/
+    {
+        "image": "base64_encoded_image_data",
+        "user_id": "uuid"
+    }
+    """
+    try:
+        data = request.data
+        image_data = data.get('image')
+        user_id = data.get('user_id', str(request.user.id))
+        
+        if not image_data:
+            return Response({
+                'success': False,
+                'error': 'Image data is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if user can register for this user_id
+        if str(request.user.id) != user_id and not request.user.is_staff:
+            return Response({
+                'success': False,
+                'error': 'Permission denied'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        request_meta = get_request_metadata(request)
+        request_meta['user'] = request.user
+        
+        result = face_recognition_service.process_face_registration(
+            image_data=image_data,
+            user_id=user_id,
+            request_meta=request_meta
+        )
+        
+        if result['success']:
+            return Response(result, status=status.HTTP_201_CREATED)
+        else:
+            error_msg = result.get('error', '')
+            if 'user not found' in error_msg.lower():
+                return Response(result, status=status.HTTP_404_NOT_FOUND)
+            elif 'already registered' in error_msg.lower():
+                return Response(result, status=status.HTTP_409_CONFLICT)
+            else:
+                return Response(result, status=status.HTTP_400_BAD_REQUEST)
+    
+    except Exception as e:
+        logger.error(f"Face registration error: {str(e)}")
+        return Response({
+            'success': False,
+            'error': 'Internal server error'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def face_authenticate_endpoint(request):
+    """
+    Face authentication endpoint for attendance
+    
+    POST /api/face-recognition/authenticate/
+    {
+        "image": "base64_encoded_image_data"
+    }
+    """
+    try:
+        data = request.data
+        image_data = data.get('image')
+        
+        if not image_data:
+            return Response({
+                'success': False,
+                'error': 'Image data is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        request_meta = get_request_metadata(request)
+        request_meta['user'] = request.user
+        
+        result = face_recognition_service.process_face_authentication(
+            image_data=image_data,
+            request_meta=request_meta
+        )
+        
+        if result['success']:
+            return Response(result, status=status.HTTP_200_OK)
+        else:
+            error_msg = result.get('error', '')
+            if 'not recognized' in error_msg.lower() or 'no match' in error_msg.lower():
+                return Response(result, status=status.HTTP_404_NOT_FOUND)
+            elif 'no face' in error_msg.lower() or 'multiple faces' in error_msg.lower():
+                return Response(result, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    except Exception as e:
+        logger.error(f"Face authentication error: {str(e)}")
+        return Response({
+            'success': False,
+            'error': 'Internal server error'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

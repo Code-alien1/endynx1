@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,6 +15,23 @@ export default function LogoutButton({ containerStyle, buttonStyle, textStyle }:
   const { logout } = useAuth();
 
   const handleLogout = () => {
+    // Use native alert on mobile; use window.confirm on web to ensure prompt appears
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Are you sure you want to sign out?');
+      if (confirmed) {
+        (async () => {
+          try {
+            await logout();
+            router.replace('/');
+          } catch (error) {
+            console.error('Logout error:', error);
+            alert('Failed to sign out. Please try again.');
+          }
+        })();
+      }
+      return;
+    }
+
     Alert.alert(
       'Sign Out',
       'Are you sure you want to sign out?',

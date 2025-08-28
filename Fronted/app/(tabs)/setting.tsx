@@ -4,7 +4,8 @@ import {
   Text, 
   ScrollView, 
   TouchableOpacity, 
-  Alert 
+  Alert,
+  Platform
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
@@ -49,6 +50,22 @@ export default function Setting() {
   };
 
   const handleSignOut = () => {
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Are you sure you want to sign out?');
+      if (confirmed) {
+        (async () => {
+          try {
+            await logout();
+            router.replace('/');
+          } catch (error) {
+            console.error('Logout error:', error);
+            alert('Failed to sign out. Please try again.');
+          }
+        })();
+      }
+      return;
+    }
+
     Alert.alert(
       'Sign Out',
       'Are you sure you want to sign out?',

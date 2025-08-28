@@ -11,6 +11,7 @@ export interface FaceRecognitionResponse {
     role: string;
   };
   confidence?: number;
+  face_encoding?: string;
   message?: string;
   error?: string;
   attendance_eligible?: boolean;
@@ -30,13 +31,12 @@ export interface FaceRegistrationStatus {
 
 class FaceRecognitionService {
   /**
-   * Authenticate user with face recognition for login
+   * Authenticate user with face for attendance marking
    */
   async authenticateWithFace(imageBase64: string): Promise<FaceRecognitionResponse> {
     try {
-      const response = await apiService.post('/face-recognition/', {
-        image: imageBase64,
-        action: 'authenticate'
+      const response = await apiService.api.post('/face-recognition/authenticate/', {
+        image: imageBase64
       });
 
       return response.data;
@@ -46,7 +46,7 @@ class FaceRecognitionService {
       if (error.response?.status === 404) {
         return {
           success: false,
-          error: 'Face not recognized. Please register your face first or use email login.'
+          error: 'Face not recognized. Please register your face first.'
         };
       } else if (error.response?.status === 400) {
         return {
@@ -61,7 +61,7 @@ class FaceRecognitionService {
       } else {
         return {
           success: false,
-          error: 'Network error. Please check your connection and try again.'
+          error: 'Authentication failed. Please try again.'
         };
       }
     }
@@ -72,9 +72,8 @@ class FaceRecognitionService {
    */
   async registerFace(imageBase64: string, userId: string): Promise<FaceRegistrationResponse> {
     try {
-      const response = await apiService.post('/face-recognition/', {
+      const response = await apiService.api.post('/face-recognition/register/', {
         image: imageBase64,
-        action: 'register',
         user_id: userId
       });
 
@@ -87,20 +86,15 @@ class FaceRecognitionService {
           success: false,
           error: error.response.data?.error || 'Invalid image or face not detected.'
         };
-      } else if (error.response?.status === 404) {
+      } else if (error.response?.status === 409) {
         return {
           success: false,
-          error: 'User not found.'
-        };
-      } else if (error.response?.status === 500) {
-        return {
-          success: false,
-          error: 'Server error. Please try again later.'
+          error: 'Face already registered for this user.'
         };
       } else {
         return {
           success: false,
-          error: 'Network error. Please check your connection and try again.'
+          error: 'Registration failed. Please try again.'
         };
       }
     }
@@ -109,9 +103,9 @@ class FaceRecognitionService {
   /**
    * Recognize face for attendance marking
    */
-  async recognizeForAttendance(imageBase64: string): Promise<FaceRecognitionResponse> {
+  async recognizeForAttendance(imageBase64: string, userId: string): Promise<FaceRecognitionResponse> {
     try {
-      const response = await apiService.post('/face-recognition/attendance/', {
+      const response = await apiService.api.put(`/face-recognition/${userId}/`, {
         image: imageBase64
       });
 
@@ -156,7 +150,7 @@ class FaceRecognitionService {
         payload.user_id = userId;
       }
 
-      const response = await apiService.put('/face-recognition/', payload);
+      const response = await apiService.api.put('/face-recognition/', payload);
 
       return response.data;
     } catch (error: any) {
@@ -191,7 +185,7 @@ class FaceRecognitionService {
    */
   async deleteFaceRegistration(userId: string): Promise<FaceRegistrationResponse> {
     try {
-      const response = await apiService.delete(`/face-recognition/${userId}/`);
+      const response = await apiService.api.delete(`/face-recognition/${userId}/`);
 
       return response.data;
     } catch (error: any) {
@@ -221,7 +215,7 @@ class FaceRecognitionService {
    */
   async getFaceRegistrationStatus(userId: string): Promise<FaceRegistrationStatus> {
     try {
-      const response = await apiService.get(`/face-recognition/status/${userId}/`);
+      const response = await apiService.api.get(`/face-recognition/status/${userId}/`);
       
       return response.data;
     } catch (error: any) {
@@ -292,6 +286,7 @@ class FaceRecognitionService {
       };
     }
   }
+
 }
 
 export const faceRecognitionService = new FaceRecognitionService();

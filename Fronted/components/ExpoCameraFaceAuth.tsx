@@ -21,8 +21,8 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 interface ExpoCameraFaceAuthProps {
   visible: boolean;
   onClose: () => void;
-  onSuccess: (userData?: any) => void;
-  mode: 'login' | 'register';
+  onSuccess: (userData?: any, faceEncoding?: string, confidenceScore?: number) => void;
+  mode: 'login' | 'register' | 'attendance';
   title?: string;
   subtitle?: string;
 }
@@ -71,8 +71,10 @@ export default function ExpoCameraFaceAuth({
 
       if (mode === 'login') {
         await handleFaceAuthentication(photo.uri);
-      } else {
+      } else if (mode === 'register') {
         await handleFaceRegistration(photo.uri);
+      } else if (mode === 'attendance') {
+        await handleAttendanceCapture(photo.uri);
       }
 
     } catch (error) {
@@ -196,6 +198,86 @@ export default function ExpoCameraFaceAuth({
       console.error('Face registration error:', error);
       setIsProcessing(false);
       Alert.alert('Error', 'Registration failed. Please try again.');
+    }
+  };
+
+  const handleAttendanceCapture = async (imageUri: string) => {
+    try {
+      setIsProcessing(true);
+      
+      // Convert image to base64
+      const base64Image = await faceRecognitionService.convertImageToBase64(imageUri);
+      
+      // Check if user has registered face
+      const registrationStatus = await faceRecognitionService.getFaceRegistrationStatus(user?.id || '');
+      
+      if (!registrationStatus.registered) {
+        setIsProcessing(false);
+        Alert.alert(
+          'Face Not Registered',
+          'You need to register your face first. Go to Dashboard and tap "Register My Face".',
+          [{ text: 'OK', onPress: onClose }]
+        );
+        return;
+      }
+      
+      // Authenticate face for attendance
+      const result = await faceRecognitionService.authenticateWithFace(base64Image);
+      
+      setIsProcessing(false);
+      
+      if (result.success && result.user) {
+        // Verify it's the same user
+        if (result.user.id === user?.id) {
+          Alert.alert(
+            'Face Recognized!',
+            `Identity confirmed: ${result.user.first_name} ${result.user.last_name}`,
+            [
+              {
+                text: 'Mark Attendance',
+                onPress: () => {
+                  onSuccess(result.user, result.face_encoding || base64Image, result.confidence || 0.95);
+                  onClose();
+                }
+              }
+            ]
+          );
+        } else {
+          Alert.alert(
+            'Wrong Face',
+            'The face detected does not match your registered face. Please try again.',
+            [
+              {
+                text: 'Try Again',
+                onPress: () => setFeedback('Position your face in the frame')
+              },
+              {
+                text: 'Cancel',
+                onPress: onClose
+              }
+            ]
+          );
+        }
+      } else {
+        Alert.alert(
+          'Recognition Failed',
+          result.error || 'Face not recognized. Please try again.',
+          [
+            {
+              text: 'Try Again',
+              onPress: () => setFeedback('Position your face in the frame')
+            },
+            {
+              text: 'Cancel',
+              onPress: onClose
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Face capture error:', error);
+      setIsProcessing(false);
+      Alert.alert('Error', 'Face capture failed. Please try again.');
     }
   };
 

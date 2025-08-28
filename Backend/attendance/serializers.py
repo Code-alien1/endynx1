@@ -208,7 +208,7 @@ class AttendanceSessionCreateSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at']
     
     def validate(self, attrs):
-        # Check if session already exists for this class, date, and session type
+        # Check for existing session with same class, date, and session type
         existing_session = AttendanceSession.objects.filter(
             class_obj=attrs['class_obj'],
             date=attrs['date'],
@@ -216,9 +216,13 @@ class AttendanceSessionCreateSerializer(serializers.ModelSerializer):
         ).first()
         
         if existing_session:
-            raise serializers.ValidationError(
-                f"An attendance session already exists for {attrs['class_obj'].name} on {attrs['date']} ({attrs.get('session_type', 'Unknown')} session)"
-            )
+            raise serializers.ValidationError({
+                'non_field_errors': [
+                    f"A session for class '{attrs['class_obj'].name}' on {attrs['date']} "
+                    f"with '{attrs['session_type']}' session type already exists. "
+                    f"Please choose a different session type or date."
+                ]
+            })
         
         return attrs
 

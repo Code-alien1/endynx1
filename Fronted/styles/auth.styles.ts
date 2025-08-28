@@ -19,10 +19,10 @@ export const styles = StyleSheet.create({
   },
   loginContainer: {
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 350,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 20,
-    padding: 30,
+    padding: 25,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
@@ -148,10 +148,10 @@ export const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   footerText: {
-    position: 'absolute',
-    bottom: 30,
     color: 'hsl(200, 10%, 50%)',
     fontSize: 12,
     textAlign: 'center',
+    marginTop: 20,
+    marginBottom: 30,
   },
 });

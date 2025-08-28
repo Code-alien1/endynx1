@@ -14,7 +14,7 @@ const resolveApiBaseUrl = (): string => {
   // For development, use your computer's IP address
   // This allows the mobile app to connect to your Django server
   const developmentIPs = [
-    'http://192.168.33.107:8000/api',  // Your current network IP
+    'http://192.168.191.107:8000/api',  // Your current network IP
     'http://192.168.2.33:8000/api',    // Alternative network IP
     'http://127.0.0.1:8000/api',       // Localhost fallback
   ];
@@ -112,6 +112,7 @@ export interface AttendanceSession {
   is_active: boolean;
   attendance_count: number;
   total_students: number;
+  created_at: string;
 }
 
 export interface AttendanceRecord {
@@ -159,7 +160,7 @@ export interface AbsenceJustification {
 
 // API Service Class
 class ApiService {
-  private api: AxiosInstance;
+  public api: AxiosInstance;
 
   constructor() {
     this.api = axios.create({
@@ -294,15 +295,35 @@ class ApiService {
     return response.data;
   }
 
+  // Class Methods
+  async getClasses(): Promise<any[]> {
+    const response: AxiosResponse<any[]> = await this.api.get('/attendance/classes/');
+    return response.data;
+  }
+
   // Attendance Methods
   async getAttendanceSessions(): Promise<AttendanceSession[]> {
-    const response: AxiosResponse<AttendanceSession[]> = await this.api.get('/attendance/sessions/');
-    return response.data;
+    console.log('API: Making request to /attendance/sessions/');
+    try {
+      const response: AxiosResponse<AttendanceSession[]> = await this.api.get('/attendance/sessions/');
+      console.log('API: Sessions response status:', response.status);
+      console.log('API: Sessions response data:', JSON.stringify(response.data, null, 2));
+      return response.data;
+    } catch (error: any) {
+      console.error('API: Error fetching sessions:', error);
+      console.error('API: Error response:', error.response?.data);
+      console.error('API: Error status:', error.response?.status);
+      throw error;
+    }
   }
 
   async createAttendanceSession(sessionData: any): Promise<AttendanceSession> {
     const response: AxiosResponse<AttendanceSession> = await this.api.post('/attendance/sessions/', sessionData);
     return response.data;
+  }
+
+  async deleteAttendanceSession(sessionId: string): Promise<void> {
+    await this.api.delete(`/attendance/sessions/${sessionId}/`);
   }
 
   async getAttendanceRecords(): Promise<AttendanceRecord[]> {
@@ -318,13 +339,24 @@ class ApiService {
     location?: string,
     imageData?: string
   ): Promise<AttendanceRecord> {
-    const response: AxiosResponse<{ message: string; attendance: AttendanceRecord }> = await this.api.post('/attendance/face-recognition/', {
+    const requestData = {
       session_id: sessionId,
       face_encoding: faceEncoding,
       confidence_score: confidenceScore,
       location,
       image_data: imageData,
+    };
+    
+    console.log('API: Marking attendance with face recognition', {
+      sessionId,
+      location,
+      endpoint: '/attendance/face-recognition/',
+      requestData
     });
+    
+    const response: AxiosResponse<{ message: string; attendance: AttendanceRecord }> = await this.api.post('/attendance/face-recognition/', requestData);
+    
+    console.log('API: Face recognition attendance response:', response.data);
     return response.data.attendance;
   }
 
@@ -489,6 +521,12 @@ class ApiService {
   async storeTokens(tokens: { access: string; refresh: string }): Promise<void> {
     await AsyncStorage.setItem(TOKEN_KEY, tokens.access);
     await AsyncStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh);
+  }
+
+  // Get predefined classes for dropdowns
+  async getPredefinedClasses(): Promise<{ classes: Array<{ value: string; label: string; level: number }> }> {
+    const response = await this.api.get('/attendance/predefined-classes/');
+    return response.data;
   }
 }
 

@@ -7,6 +7,10 @@ urlpatterns = [
     # Main face recognition endpoint
     path('', views.face_recognition_endpoint, name='face_recognition'),
     
+    # Face registration endpoints
+    path('register/', views.face_registration_endpoint, name='face_registration'),
+    path('authenticate/', views.face_authenticate_endpoint, name='face_authenticate'),
+    
     # Face recognition for attendance
     path('attendance/', views.face_attendance_endpoint, name='face_attendance'),
     

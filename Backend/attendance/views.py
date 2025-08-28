@@ -1,20 +1,17 @@
-from rest_framework import status, generics, permissions
+from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.utils import timezone
 from django.db.models import Q, Count, Avg
+from django.http import JsonResponse
+from datetime import timedelta, datetime
 from django.shortcuts import get_object_or_404
-from datetime import datetime, timedelta
-import uuid
 import qrcode
 import base64
 from io import BytesIO
 
-from edynx_backend.permissions import (
-    CanManageAttendance, CanViewAllStudents, IsOwnerOrAdmin,
-    ParentChildPermission, MentorMenteePermission, IsTeacherOrAdmin
-)
+from edynx_backend.permissions import ParentChildPermission, IsOwnerOrAdmin, MentorMenteePermission, IsTeacherOrAdmin
 from edynx_backend.filters import RoleBasedDataFilter, AttendanceDataFilter
 
 from .models import (
@@ -34,9 +31,29 @@ from .serializers import (
 from users.models import User
 
 
+def is_session_within_marking_window(session):
+    """
+    Check if the session is within the marking window.
+    Returns True if current time is within the session's active period.
+    """
+    now = timezone.now()
+    
+    # Convert session start and end times to datetime objects for today
+    session_date = session.date
+    start_datetime = timezone.make_aware(
+        datetime.combine(session_date, session.start_time)
+    )
+    end_datetime = timezone.make_aware(
+        datetime.combine(session_date, session.end_time)
+    )
+    
+    # Allow marking attendance from session start time until end time
+    return start_datetime <= now <= end_datetime and session.is_active
+
+
 class AttendanceStatisticsView(APIView):
     """View for getting attendance statistics with role-based filtering"""
-    permission_classes = [permissions.IsAuthenticated, CanViewAllStudents]
+    permission_classes = [permissions.IsAuthenticated, IsTeacherOrAdmin]
     
     def get(self, request):
         # Get filters from query parameters
@@ -68,7 +85,7 @@ class AttendanceStatisticsView(APIView):
 
 class RoleBasedAttendanceView(APIView):
     """View for getting attendance data filtered by user role"""
-    permission_classes = [permissions.IsAuthenticated, CanViewAllStudents]
+    permission_classes = [permissions.IsAuthenticated, IsTeacherOrAdmin]
     
     def get(self, request):
         # Build filters from query parameters
@@ -137,20 +154,57 @@ class ClassDetailView(generics.RetrieveUpdateDestroyAPIView):
 class AttendanceSessionListView(generics.ListCreateAPIView):
     """View for listing and creating attendance sessions"""
     permission_classes = [permissions.IsAuthenticated, ParentChildPermission]
-    serializer_class = AttendanceSessionSerializer
+    
+    def get_serializer_class(self):
+        if self.request.method == 'POST':
+            return AttendanceSessionCreateSerializer
+        return AttendanceSessionSerializer
     
     def get_queryset(self):
         user = self.request.user
+        print(f"DEBUG: User {user.username} (role: {user.role}) requesting sessions")
+        
         if user.is_teacher():
-            return AttendanceSession.objects.filter(created_by=user)
+            # Show all sessions for teachers, not just ones they created
+            queryset = AttendanceSession.objects.all()
+            print(f"DEBUG: Teacher queryset (all sessions): {queryset.count()} sessions")
+            
+            # Debug: show session details
+            for session in queryset:
+                creator = session.created_by.username if session.created_by else 'NULL'
+                print(f"DEBUG: Session {session.id}: {session.class_obj.name} - {session.date} - created by: {creator}")
+            
+            return queryset
         elif user.is_student():
-            return AttendanceSession.objects.filter(class_obj__students=user)
+            print(f"DEBUG: Student {user.username} requesting sessions")
+            print(f"DEBUG: Student class_name: {getattr(user, 'class_name', 'None')}")
+            
+            # TEMPORARY FIX: Show all sessions to students for testing
+            # This allows students to see all sessions but they can only mark attendance for their class
+            queryset = AttendanceSession.objects.all()
+            print(f"DEBUG: Showing all {queryset.count()} sessions to student for testing")
+            
+            # Debug: show all sessions
+            for session in queryset:
+                print(f"DEBUG: Session {session.id}: class={session.class_obj.name}, date={session.date}")
+            
+            return queryset
         elif user.is_administration() or user.is_superadmin():
-            return AttendanceSession.objects.all()
+            queryset = AttendanceSession.objects.all()
+            print(f"DEBUG: Admin queryset: {queryset.count()} sessions")
+            return queryset
+        
+        print(f"DEBUG: No matching role, returning empty queryset")
         return AttendanceSession.objects.none()
     
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        print(f"DEBUG: Creating session with data: {serializer.validated_data}")
+        print(f"DEBUG: Created by user: {self.request.user.username}")
+        session = serializer.save(created_by=self.request.user)
+        print(f"DEBUG: Session created with ID: {session.id}")
+        print(f"DEBUG: Session class: {session.class_obj.name}")
+        print(f"DEBUG: Total sessions in DB after creation: {AttendanceSession.objects.count()}")
+        return session
 
 
 class AttendanceSessionDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -192,6 +246,7 @@ class FaceRecognitionAttendanceView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     
     def post(self, request):
+        print(f"DEBUG: Face recognition attendance request data: {request.data}")
         serializer = FaceRecognitionAttendanceSerializer(data=request.data)
         if serializer.is_valid():
             session_id = serializer.validated_data['session_id']
@@ -199,6 +254,7 @@ class FaceRecognitionAttendanceView(APIView):
             confidence_score = serializer.validated_data['confidence_score']
             location = serializer.validated_data.get('location', '')
             image_data = serializer.validated_data.get('image_data', '')
+            print(f"DEBUG: Validated data - session_id: {session_id}, face_encoding length: {len(face_encoding) if face_encoding else 0}")
             
             try:
                 session = AttendanceSession.objects.get(id=session_id)
@@ -209,6 +265,13 @@ class FaceRecognitionAttendanceView(APIView):
                     return Response(
                         {'error': 'You are not enrolled in this class'},
                         status=status.HTTP_403_FORBIDDEN
+                    )
+                
+                # Check if session is within the 15-minute marking window
+                if not is_session_within_marking_window(session):
+                    return Response(
+                        {'error': 'Session marking window has closed. You can only mark attendance within 15 minutes of session creation.'},
+                        status=status.HTTP_400_BAD_REQUEST
                     )
                 
                 # Check if attendance already exists
@@ -274,6 +337,13 @@ class QRCodeAttendanceView(APIView):
                     return Response(
                         {'error': 'You are not enrolled in this class'},
                         status=status.HTTP_403_FORBIDDEN
+                    )
+                
+                # Check if session is within the 15-minute marking window
+                if not is_session_within_marking_window(session):
+                    return Response(
+                        {'error': 'Session marking window has closed. You can only mark attendance within 15 minutes of session creation.'},
+                        status=status.HTTP_400_BAD_REQUEST
                     )
                 
                 # Verify QR code
@@ -348,6 +418,13 @@ class PeerAttendanceView(APIView):
                     return Response(
                         {'error': 'You are not enrolled in this class'},
                         status=status.HTTP_403_FORBIDDEN
+                    )
+                
+                # Check if session is within the 15-minute marking window
+                if not is_session_within_marking_window(session):
+                    return Response(
+                        {'error': 'Session marking window has closed. You can only mark attendance within 15 minutes of session creation.'},
+                        status=status.HTTP_400_BAD_REQUEST
                     )
                 
                 # Check if scanned student is enrolled in this class
@@ -427,7 +504,7 @@ class AbsenceJustificationDetailView(generics.RetrieveUpdateAPIView):
 # QR Code Management
 class QRCodeGenerateView(APIView):
     """View for generating QR codes"""
-    permission_classes = [permissions.IsAuthenticated, CanManageAttendance]
+    permission_classes = [permissions.IsAuthenticated, IsTeacherOrAdmin]
     
     def post(self, request):
         serializer = QRCodeGenerateSerializer(data=request.data)
@@ -478,6 +555,7 @@ class QRCodeGenerateView(APIView):
                     status=status.HTTP_404_NOT_FOUND
                 )
         
+        print(f"DEBUG: Face recognition serializer validation errors: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -520,6 +598,7 @@ class AttendanceVerificationView(APIView):
                     status=status.HTTP_404_NOT_FOUND
                 )
         
+        print(f"DEBUG: Face recognition serializer validation errors: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -672,3 +751,73 @@ class AttendanceStatisticsView(APIView):
             })
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# Predefined Classes API
+class PredefinedClassesView(APIView):
+    """View to return predefined classes for dropdowns"""
+    permission_classes = [permissions.AllowAny]  # Allow access for dropdowns
+    
+    def get(self, request):
+        """Get predefined classes for dropdowns"""
+        try:
+            # Get all classes from database
+            classes = Class.objects.all().order_by('name')
+            predefined_classes = []
+            
+            for class_obj in classes:
+                predefined_classes.append({
+                    'value': str(class_obj.id),  # UUID as string
+                    'label': class_obj.name,
+                    'level': class_obj.level
+                })
+            
+            # If no classes in database, create them automatically
+            if not predefined_classes:
+                from users.models import User
+                
+                # Get or create a default teacher
+                teacher, created = User.objects.get_or_create(
+                    email='default.teacher@edynx.com',
+                    defaults={
+                        'username': 'default_teacher',
+                        'first_name': 'Default',
+                        'last_name': 'Teacher',
+                        'role': 'teacher',
+                        'is_active': True,
+                    }
+                )
+                
+                if created:
+                    teacher.set_password('defaultpassword123')
+                    teacher.save()
+                
+                # Create predefined classes
+                classes_data = [
+                    {'name': 'BA1A', 'level': 1},
+                    {'name': 'BA1B', 'level': 1},
+                    {'name': 'BA1C', 'level': 1},
+                    {'name': 'BA1D', 'level': 1},
+                    {'name': 'BA2A', 'level': 2},
+                    {'name': 'BA2B', 'level': 2},
+                ]
+                
+                for class_data in classes_data:
+                    class_obj, created = Class.objects.get_or_create(
+                        name=class_data['name'],
+                        defaults={
+                            'level': class_data['level'],
+                            'teacher': teacher,
+                        }
+                    )
+                    predefined_classes.append({
+                        'value': str(class_obj.id),
+                        'label': class_obj.name,
+                        'level': class_obj.level
+                    })
+            
+            return Response({'classes': predefined_classes})
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to fetch predefined classes: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

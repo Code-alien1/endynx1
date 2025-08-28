@@ -174,6 +174,16 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("A user with this email already exists")
         return value
     
+    def validate_class_name(self, value):
+        """Validate that class_name is one of the predefined classes"""
+        if value:
+            predefined_classes = ['BA1A', 'BA1B', 'BA1C', 'BA1D', 'BA2A', 'BA2B']
+            if value not in predefined_classes:
+                raise serializers.ValidationError(
+                    f"Class name must be one of: {', '.join(predefined_classes)}"
+                )
+        return value
+    
     def create(self, validated_data):
         validated_data.pop('password_confirm')
         profile_data = validated_data.pop('profile', None)
