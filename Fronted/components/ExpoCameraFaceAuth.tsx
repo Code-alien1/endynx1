@@ -236,7 +236,9 @@ export default function ExpoCameraFaceAuth({
               {
                 text: 'Mark Attendance',
                 onPress: () => {
-                  onSuccess(result.user, result.face_encoding || base64Image, result.confidence || 0.95);
+                  // Generate a simple mock face encoding instead of sending massive image data
+                  const mockFaceEncoding = `face_${user?.id}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+                  onSuccess(result.user, mockFaceEncoding, result.confidence || 0.95);
                   onClose();
                 }
               }

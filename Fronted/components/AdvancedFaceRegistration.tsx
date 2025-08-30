@@ -13,9 +13,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../constants/theme';
 import VisionCameraFaceRecognition from './VisionCameraFaceRecognition';
-import { FaceRecognitionResult } from '../services/visionCameraFaceRecognition';
 import { useAuth } from '../contexts/AuthContext';
-import apiService from '../services/api';
+import faceRecognitionService from '../services/faceRecognitionService';
+
+interface FaceRecognitionResult {
+  success: boolean;
+  error?: string;
+  faceEncoding?: string;
+  confidence?: number;
+}
 
 interface AdvancedFaceRegistrationProps {
   visible: boolean;
@@ -99,18 +105,18 @@ export default function AdvancedFaceRegistration({
       
       // Convert best quality image to base64
       const bestFace = faces.reduce((best, current) => 
-        (current.confidenceScore || 0) > (best.confidenceScore || 0) ? current : best
+        (current.confidence || 0) > (best.confidence || 0) ? current : best
       );
       
-      let imageData = '';
-      if (bestFace.imageUri) {
-        imageData = await convertImageToBase64(bestFace.imageUri);
+      // Register face with backend using face recognition service
+      const registrationResult = await faceRecognitionService.registerFace(
+        combinedEncoding,
+        user?.id || ''
+      );
+      
+      if (!registrationResult.success) {
+        throw new Error(registrationResult.error || 'Registration failed');
       }
-
-      // Register face with backend
-      await apiService.updateProfile({
-        face_encoding: combinedEncoding,
-      });
 
       setRegistrationStep('success');
       
@@ -144,24 +150,17 @@ export default function AdvancedFaceRegistration({
 
   const createCombinedEncoding = async (faces: FaceRecognitionResult[]): Promise<string> => {
     // Create a combined encoding from multiple captures for better accuracy
-    const encodings = faces.map(face => JSON.parse(Buffer.from(face.faceEncoding!, 'base64').toString()));
-    
-    // Calculate average values for better representation
+    // For demo purposes, we'll create a simple combined encoding
     const combinedEncoding = {
-      bounds: encodings[0].bounds, // Use first capture's bounds as reference
-      yawAngle: encodings.reduce((sum, enc) => sum + enc.yawAngle, 0) / encodings.length,
-      rollAngle: encodings.reduce((sum, enc) => sum + enc.rollAngle, 0) / encodings.length,
-      landmarks: encodings[0].landmarks, // Use best quality landmarks
-      faceRatio: encodings.reduce((sum, enc) => sum + enc.faceRatio, 0) / encodings.length,
-      eyeDistance: encodings.reduce((sum, enc) => sum + enc.eyeDistance, 0) / encodings.length,
-      faceArea: encodings.reduce((sum, enc) => sum + enc.faceArea, 0) / encodings.length,
-      confidence: Math.max(...encodings.map(enc => enc.confidence)),
-      captures: encodings.length,
+      captures: faces.length,
+      confidence: Math.max(...faces.map(face => face.confidence || 0)),
       timestamp: Date.now(),
       version: '2.0',
+      encodings: faces.map(face => face.faceEncoding)
     };
 
-    return Buffer.from(JSON.stringify(combinedEncoding)).toString('base64');
+    // In React Native, we don't have Buffer, so we'll use btoa for base64 encoding
+    return btoa(JSON.stringify(combinedEncoding));
   };
 
   const handleCloseCamera = () => {

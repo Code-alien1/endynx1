@@ -12,9 +12,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../constants/theme';
 import VisionCameraFaceRecognition from './VisionCameraFaceRecognition';
-import { FaceRecognitionResult } from '../services/visionCameraFaceRecognition';
 import { useAuth } from '../contexts/AuthContext';
-import apiService from '../services/api';
+import faceRecognitionService from '../services/faceRecognitionService';
+
+interface FaceRecognitionResult {
+  success: boolean;
+  error?: string;
+  faceEncoding?: string;
+  confidence?: number;
+  imageUri?: string;
+}
 
 interface AdvancedFaceAuthenticationProps {
   visible: boolean;
@@ -58,9 +65,7 @@ export default function AdvancedFaceAuthentication({
       }
 
       // Send face encoding to backend for authentication
-      const response = await apiService.faceLogin(
-        result.faceEncoding,
-        result.confidenceScore || 0.8,
+      const response = await faceRecognitionService.authenticateWithFace(
         imageData
       );
 

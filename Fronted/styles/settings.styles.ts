@@ -103,7 +103,7 @@ export const settingsStyles = StyleSheet.create({
     marginBottom: 8,
   },
   input: {
-    backgroundColor: COLORS.input,
+    backgroundColor: COLORS.card,
     borderRadius: 12,
     paddingVertical: 15,
     paddingHorizontal: 16,

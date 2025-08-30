@@ -50,7 +50,7 @@ export default function LandingPage() {
             <Text style={styles.title}>Welcome to Edynx</Text>
             <Text style={styles.subtitle}>
               The future of education management is here. Experience seamless 
-              attendance tracking, face recognition, and comprehensive school 
+              attendance tracking, parent integration, and comprehensive school 
               administration.
             </Text>
 
@@ -58,9 +58,9 @@ export default function LandingPage() {
             <View style={styles.features}>
               <View style={styles.feature}>
                 <View style={styles.featureIcon}>
-                  <Text style={styles.featureIconText}>👤</Text>
+                  <Text style={styles.featureIconText}>👨‍👩‍👧‍👦</Text>
                 </View>
-                <Text style={styles.featureText}>Face Recognition Login</Text>
+                <Text style={styles.featureText}>Parent Integration</Text>
               </View>
               
               <View style={styles.feature}>

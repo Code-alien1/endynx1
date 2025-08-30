@@ -55,10 +55,7 @@ export default function WorkingFaceAuth({
       setIsProcessing(true);
       setFeedback('Processing...');
 
-      const photo = await camera.current.takePhoto({
-        quality: 85,
-        skipMetadata: false,
-      });
+      const photo = await camera.current.takePhoto();
 
       if (!photo) {
         throw new Error('Failed to capture photo');

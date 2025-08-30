@@ -82,6 +82,13 @@ export default function FaceAttendanceCamera({
 
   const handleFaceAttendance = async (imageUri: string) => {
     try {
+      // Ensure user is available
+      if (!user?.id) {
+        Alert.alert('Error', 'You must be logged in to mark attendance.');
+        setIsProcessing(false);
+        return;
+      }
+
       // Validate image first
       const validation = await faceRecognitionService.validateImage(imageUri);
       if (!validation.valid) {
@@ -94,7 +101,7 @@ export default function FaceAttendanceCamera({
       const base64Image = await faceRecognitionService.convertImageToBase64(imageUri);
 
       // Send to face recognition API for attendance
-      const result = await faceRecognitionService.recognizeForAttendance(base64Image);
+      const result = await faceRecognitionService.recognizeForAttendance(base64Image, user.id);
       
       setIsProcessing(false);
       

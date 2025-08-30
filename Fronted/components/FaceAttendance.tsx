@@ -12,9 +12,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../constants/theme';
 import FaceRecognitionCamera from './FaceRecognitionCamera';
-import { FaceRecognitionResult } from '../services/faceRecognition';
 import { useAuth } from '../contexts/AuthContext';
 import apiService, { AttendanceSession } from '../services/api';
+
+interface FaceRecognitionResult {
+  success: boolean;
+  error?: string;
+  faceEncoding?: string;
+  confidence?: number;
+  imageUri?: string;
+}
 
 interface FaceAttendanceProps {
   visible: boolean;
@@ -83,7 +90,7 @@ export default function FaceAttendance({
       const attendance = await apiService.markAttendanceWithFace(
         session.id,
         result.faceEncoding,
-        result.confidenceScore || 0.8,
+        Math.round((result.confidence || 0.8) * 1000) / 1000,
         location,
         imageData
       );

@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-%9*+8i4lcc9$==%r=4kmyjpk!@*ya7to))kyxupzthdllq+y(s
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '192.168.2.33', '192.168.33.107','192.168.191.107']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '192.168.2.33', '192.168.33.107', '192.168.83.107', '192.168.191.107']
 
 
 # Application definition
@@ -53,6 +53,8 @@ INSTALLED_APPS = [
     'mentors',
     'announcements',
     'face_recognition',
+    'edynx_admin',
+    'chat',
 ]
 
 MIDDLEWARE = [
@@ -215,6 +217,11 @@ CORS_ALLOWED_ORIGINS = [
     "exp://192.168.33.107:8082",
     "http://192.168.33.107:8081",
     "http://192.168.33.107:8082",
+    # Mobile device IP
+    "exp://192.168.83.107:8081",
+    "exp://192.168.83.107:8082",
+    "http://192.168.83.107:8081",
+    "http://192.168.83.107:8082",
 ]
 
 CORS_ALLOW_CREDENTIALS = True

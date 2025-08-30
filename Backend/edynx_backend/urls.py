@@ -61,6 +61,9 @@ urlpatterns = [
     path('api/users/', include('users.urls')),
     path('api/attendance/', include('attendance.urls')),
     path('api/face-recognition/', include('face_recognition.urls')),
+    path('api/admin/', include('edynx_admin.urls')),
+    path('api/announcements/', include('announcements.urls')),
+    path('', include('chat.urls')),
 ]
 
 # Serve media files during development

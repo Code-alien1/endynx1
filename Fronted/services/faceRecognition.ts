@@ -7,9 +7,9 @@ export interface FaceData {
     origin: { x: number; y: number };
     size: { width: number; height: number };
   };
-  faceID: number;
-  rollAngle: number;
-  yawAngle: number;
+  faceID?: number;
+  rollAngle?: number;
+  yawAngle?: number;
   smilingProbability?: number;
   leftEyeOpenProbability?: number;
   rightEyeOpenProbability?: number;
@@ -100,7 +100,9 @@ class FaceRecognitionService {
     }
 
     // Check face angle (too much rotation)
-    if (Math.abs(face.rollAngle) > 30 || Math.abs(face.yawAngle) > 30) {
+    const rollAngle = face.rollAngle ?? 0;
+    const yawAngle = face.yawAngle ?? 0;
+    if (Math.abs(rollAngle) > 30 || Math.abs(yawAngle) > 30) {
       return { isValid: false, reason: 'Please face the camera directly.' };
     }
 
@@ -124,8 +126,8 @@ class FaceRecognitionService {
       // In production, you'd extract actual facial features using ML models
       const encoding = {
         bounds: face.bounds,
-        rollAngle: face.rollAngle,
-        yawAngle: face.yawAngle,
+        rollAngle: face.rollAngle ?? 0,
+        yawAngle: face.yawAngle ?? 0,
         faceID: face.faceID,
         timestamp: Date.now()
       };
@@ -150,7 +152,9 @@ class FaceRecognitionService {
     else if (faceSize > 150) score += 0.1;
 
     // Face angle factor
-    const angleScore = 1 - (Math.abs(face.rollAngle) + Math.abs(face.yawAngle)) / 60;
+    const rollAngle = face.rollAngle ?? 0;
+    const yawAngle = face.yawAngle ?? 0;
+    const angleScore = 1 - (Math.abs(rollAngle) + Math.abs(yawAngle)) / 60;
     score += angleScore * 0.2;
 
     // Eye openness factor

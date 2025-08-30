@@ -6,29 +6,165 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  RefreshControl,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import AppBackground from '../../components/AppBackground';
 import ExpoCameraFaceAuth from '../../components/ExpoCameraFaceAuth';
-import { COLORS } from '../../constants/theme';
+import { COLORS, theme } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
 import { getRoleDashboardTitle } from '../../utils/roleRedirect';
 import faceRecognitionService from '../../services/faceRecognitionService';
+import { router } from 'expo-router';
 
 export default function DashboardScreen() {
   const { user } = useAuth();
+  const [refreshing, setRefreshing] = useState(false);
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    pendingJustifications: 0,
+    activeAnnouncements: 0,
+    attendanceRecords: 0,
+  });
+
+  if (!user) return null;
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      // Mock data for now - replace with actual API calls
+      setStats({
+        totalUsers: 156,
+        pendingJustifications: 8,
+        activeAnnouncements: 3,
+        attendanceRecords: 1247,
+      });
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadDashboardData();
+    setRefreshing(false);
+  };
+
+  const navigateToTab = (tabName: string) => {
+    router.push(`/(tabs)/${tabName}`);
+  };
+
+  // Show admin dashboard for administration users
+  if (user.role === 'administration') {
+    return (
+      <AppBackground>
+        <ScrollView 
+          style={styles.container} 
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
+          <View style={styles.adminHeader}>
+            <Text style={styles.adminTitle}>Administration Dashboard</Text>
+            <Text style={styles.welcomeText}>Welcome back, {user.first_name}</Text>
+          </View>
+          
+          <View style={styles.statsContainer}>
+            <View style={[styles.statCard, styles.primaryStatCard]}>
+              <View style={styles.statIconContainer}>
+                <Ionicons name="people" size={28} color="white" />
+              </View>
+              <View style={styles.statTextContainer}>
+                <Text style={styles.statNumber}>{stats.totalUsers}</Text>
+                <Text style={styles.statLabel}>Total Users</Text>
+              </View>
+            </View>
+            
+            <View style={[styles.statCard, styles.warningStatCard]}>
+              <View style={styles.statIconContainer}>
+                <Ionicons name="document-text" size={28} color="white" />
+              </View>
+              <View style={styles.statTextContainer}>
+                <Text style={styles.statNumber}>{stats.pendingJustifications}</Text>
+                <Text style={styles.statLabel}>Pending Justifications</Text>
+              </View>
+            </View>
+            
+            <View style={[styles.statCard, styles.successStatCard]}>
+              <View style={styles.statIconContainer}>
+                <Ionicons name="megaphone" size={28} color="white" />
+              </View>
+              <View style={styles.statTextContainer}>
+                <Text style={styles.statNumber}>{stats.activeAnnouncements}</Text>
+                <Text style={styles.statLabel}>Active Announcements</Text>
+              </View>
+            </View>
+            
+            <View style={[styles.statCard, styles.infoStatCard]}>
+              <View style={styles.statIconContainer}>
+                <Ionicons name="calendar" size={28} color="white" />
+              </View>
+              <View style={styles.statTextContainer}>
+                <Text style={styles.statNumber}>{stats.attendanceRecords}</Text>
+                <Text style={styles.statLabel}>Attendance Records</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.quickActionsContainer}>
+            <Text style={styles.sectionTitle}>Quick Actions</Text>
+            <View style={styles.quickActionsGrid}>
+              <TouchableOpacity 
+                style={styles.quickActionCard}
+                onPress={() => navigateToTab('users')}
+              >
+                <Ionicons name="person-add" size={24} color={theme.colors.primary} />
+                <Text style={styles.quickActionText}>Add User</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.quickActionCard}
+                onPress={() => navigateToTab('announcements')}
+              >
+                <Ionicons name="megaphone" size={24} color={theme.colors.primary} />
+                <Text style={styles.quickActionText}>New Announcement</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.quickActionCard}
+                onPress={() => navigateToTab('justifications')}
+              >
+                <Ionicons name="checkmark-circle" size={24} color={theme.colors.primary} />
+                <Text style={styles.quickActionText}>Review Justifications</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.quickActionCard}
+                onPress={() => navigateToTab('attendance')}
+              >
+                <Ionicons name="list" size={24} color={theme.colors.primary} />
+                <Text style={styles.quickActionText}>View Attendance</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </AppBackground>
+    );
+  }
+
+  // Original dashboard for other roles
+  const dashboardTitle = getRoleDashboardTitle(user.role);
+  const currentTime = new Date();
+  const greeting = currentTime.getHours() < 12 ? 'Good Morning' : 
+                  currentTime.getHours() < 18 ? 'Good Afternoon' : 'Good Evening';
+
   const [showFaceRegistration, setShowFaceRegistration] = useState(false);
   const [faceRegistrationStatus, setFaceRegistrationStatus] = useState<{
     registered: boolean;
     loading: boolean;
   }>({ registered: false, loading: true });
-
-  if (!user) return null;
-
-  const dashboardTitle = getRoleDashboardTitle(user.role);
-  const currentTime = new Date();
-  const greeting = currentTime.getHours() < 12 ? 'Good Morning' : 
-                  currentTime.getHours() < 18 ? 'Good Afternoon' : 'Good Evening';
 
   useEffect(() => {
     if (user.role === 'student') {
@@ -121,7 +257,7 @@ export default function DashboardScreen() {
                 ) : faceRegistrationStatus.registered ? (
                   <View>
                     <Text style={styles.cardDescription}>
-                      ✅ Your face is registered! You can use face recognition for attendance.
+                      Your face is registered! You can use face recognition for attendance.
                     </Text>
                     <TouchableOpacity 
                       style={styles.updateFaceButton}
@@ -324,8 +460,117 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
   },
   updateFaceButtonText: {
+    marginLeft: 8,
     color: COLORS.primary,
     fontSize: 14,
     fontWeight: '600',
+  },
+  // Admin Dashboard Styles
+  adminHeader: {
+    marginBottom: 24,
+    paddingHorizontal: 4,
+  },
+  adminTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+  },
+  welcomeText: {
+    fontSize: 16,
+    color: '#9CA3AF',
+    marginTop: 4,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  statCard: {
+    backgroundColor: theme.colors.card,
+    padding: 20,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '48%',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  primaryStatCard: {
+    backgroundColor: theme.colors.primary,
+  },
+  warningStatCard: {
+    backgroundColor: theme.colors.warning,
+  },
+  successStatCard: {
+    backgroundColor: theme.colors.success,
+  },
+  infoStatCard: {
+    backgroundColor: '#3B82F6',
+  },
+  statIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  statTextContainer: {
+    flex: 1,
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 4,
+  },
+  quickActionsContainer: {
+    marginTop: 24,
+    paddingHorizontal: 4,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    marginBottom: 16,
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  quickActionCard: {
+    backgroundColor: theme.colors.card,
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    width: '48%',
+    marginBottom: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 100,
+  },
+  quickActionText: {
+    fontSize: 14,
+    color: theme.colors.text,
+    marginTop: 8,
+    textAlign: 'center',
+    fontWeight: '500',
   },
 });

@@ -27,6 +27,7 @@
     "expo-blur": "~14.1.5",
     "expo-camera": "^16.1.11",
     "expo-constants": "~17.1.7",
+    "expo-face-detector": "^13.0.2",
     "expo-file-system": "^18.1.11",
     "expo-font": "~13.3.2",
     "expo-haptics": "~14.1.4",
@@ -58,7 +59,8 @@
     "react-native-web": "~0.20.0",
     "react-native-webview": "13.13.5",
     "rimraf": "^6.0.1",
-    "vision-camera-face-detector": "^0.1.8"
+    "vision-camera-face-detector": "^0.1.8",
+    "expo-image-picker": "~16.1.4"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

@@ -38,30 +38,54 @@ export default function MentorScreen({}: MentorScreenProps) {
   const loadMentorData = async () => {
     try {
       setLoading(true);
-      const mentorsData = await apiService.getMentors();
-      console.log('Mentors data:', mentorsData); // Debug log
-      // Ensure mentorsData is always an array
-      setMentors(Array.isArray(mentorsData) ? mentorsData : []);
       
-      // For now, we'll use mock appointments since we haven't built the appointment system yet
+      // Mock data showing the student's assigned mentor
+      const mockAssignedMentor: User = {
+        id: '1',
+        username: 'dr.smith',
+        email: 'dr.smith@university.edu',
+        first_name: 'Dr. Sarah',
+        last_name: 'Smith',
+        role: 'mentor',
+        class_name: 'Academic Advisor',
+        level: 5,
+        rating: 4.8,
+        total_ratings: 25,
+        phone_number: '+1-555-0123',
+        created_at: new Date().toISOString()
+      };
+
+      // Set the assigned mentor
+      setMentors([mockAssignedMentor]);
+      
+      // Mock appointments with the assigned mentor
       setAppointments([
         {
           id: '1',
           mentorId: '1',
-          mentorName: 'John Doe',
-          date: '2024-01-15',
+          mentorName: 'Dr. Sarah Smith',
+          date: '2024-02-01',
           time: '14:00',
           status: 'scheduled',
-          subject: 'Mathematics',
+          subject: 'Academic Planning',
         },
         {
           id: '2',
-          mentorId: '2',
-          mentorName: 'Jane Smith',
-          date: '2024-01-16',
+          mentorId: '1',
+          mentorName: 'Dr. Sarah Smith',
+          date: '2024-01-28',
           time: '10:00',
           status: 'completed',
-          subject: 'Physics',
+          subject: 'Career Guidance',
+        },
+        {
+          id: '3',
+          mentorId: '1',
+          mentorName: 'Dr. Sarah Smith',
+          date: '2024-01-25',
+          time: '15:30',
+          status: 'completed',
+          subject: 'Study Strategies',
         },
       ]);
     } catch (error) {
@@ -470,7 +494,7 @@ export default function MentorScreen({}: MentorScreenProps) {
 
               <TextInput
                 style={{
-                  backgroundColor: COLORS.input,
+                  backgroundColor: COLORS.card,
                   padding: 12,
                   borderRadius: 8,
                   color: COLORS.foreground,
@@ -484,7 +508,7 @@ export default function MentorScreen({}: MentorScreenProps) {
 
               <TextInput
                 style={{
-                  backgroundColor: COLORS.input,
+                  backgroundColor: COLORS.card,
                   padding: 12,
                   borderRadius: 8,
                   color: COLORS.foreground,
@@ -498,7 +522,7 @@ export default function MentorScreen({}: MentorScreenProps) {
 
               <TextInput
                 style={{
-                  backgroundColor: COLORS.input,
+                  backgroundColor: COLORS.card,
                   padding: 12,
                   borderRadius: 8,
                   color: COLORS.foreground,

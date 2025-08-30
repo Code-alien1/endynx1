@@ -1,36 +1,264 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, Modal, TextInput } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../constants/theme';
+import { apiService } from '../../services/api';
+
+interface Absence {
+  id: string;
+  date: string;
+  session_name: string;
+  subject: string;
+  start_time: string;
+  end_time: string;
+  status: 'absent' | 'justified' | 'pending' | 'approved' | 'rejected';
+  reason?: string;
+  justification_id?: string;
+  approval_status?: 'pending' | 'approved' | 'rejected';
+  admin_comment?: string;
+}
+
+interface JustificationSubmission {
+  absence_id: string;
+  reason: string;
+  photo_uri?: string;
+  photo_base64?: string;
+}
 
 export default function AbsencesScreen() {
   const { user } = useAuth();
-  const [absences, setAbsences] = useState([
-    {
-      id: '1',
-      date: '2024-08-25',
-      session: 'Morning Session',
-      status: 'pending',
-      reason: 'Medical appointment',
-      hasJustification: true
-    },
-    {
-      id: '2',
-      date: '2024-08-23',
-      session: 'Afternoon Session',
-      status: 'approved',
-      reason: 'Family emergency',
-      hasJustification: true
-    }
-  ]);
+  const [absences, setAbsences] = useState<Absence[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleJustifyAbsence = () => {
+  const [showJustifyModal, setShowJustifyModal] = useState(false);
+  const [selectedAbsenceId, setSelectedAbsenceId] = useState<string | null>(null);
+  const [justificationReason, setJustificationReason] = useState('');
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [justifications, setJustifications] = useState<any[]>([]);
+
+  useEffect(() => {
+    loadAbsences();
+    loadJustifications();
+  }, []);
+
+  const loadAbsences = async () => {
+    try {
+      setIsLoading(true);
+      // Get sessions where student was absent (didn't mark attendance)
+      const sessionsResponse = await apiService.getAttendanceSessions();
+      const attendanceResponse = await apiService.getAttendanceRecords();
+      
+      // Handle paginated response format
+      let sessions: any[] = [];
+      if (sessionsResponse && (sessionsResponse as any).results && Array.isArray((sessionsResponse as any).results)) {
+        sessions = (sessionsResponse as any).results;
+      } else if (Array.isArray(sessionsResponse)) {
+        sessions = sessionsResponse;
+      }
+
+      let attendanceRecords: any[] = [];
+      if (attendanceResponse && (attendanceResponse as any).results && Array.isArray((attendanceResponse as any).results)) {
+        attendanceRecords = (attendanceResponse as any).results;
+      } else if (Array.isArray(attendanceResponse)) {
+        attendanceRecords = attendanceResponse;
+      }
+      
+      // Find sessions where student didn't mark attendance
+      const absentSessions = sessions.filter((session: any) => {
+        const hasAttendance = attendanceRecords.some((record: any) => 
+          record.session === session.id && record.student === user?.id
+        );
+        return !hasAttendance && new Date(session.date + ' ' + session.end_time) < new Date();
+      });
+
+      const absenceData: Absence[] = absentSessions.map(session => ({
+        id: session.id,
+        date: session.date,
+        session_name: session.class_name,
+        subject: session.class_name || 'General Session',
+        start_time: session.start_time,
+        end_time: session.end_time,
+        status: 'absent' as const,
+        reason: 'Did not mark attendance'
+      }));
+
+      setAbsences(absenceData);
+    } catch (error) {
+      console.error('Error loading absences:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleJustifyAbsence = (absenceId?: string) => {
+    setSelectedAbsenceId(absenceId || null);
+    setShowJustifyModal(true);
+  };
+
+  const pickImageFromGallery = async () => {
+    try {
+      // Request permission to access media library
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please grant permission to access your photo gallery.');
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setSelectedPhoto(result.assets[0].uri);
+        console.log('Photo selected from gallery:', result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to select image from gallery.');
+    }
+  };
+
+  const takePhotoWithCamera = async () => {
+    try {
+      // Request camera permission
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please grant permission to access your camera.');
+        return;
+      }
+
+      // Launch camera
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setSelectedPhoto(result.assets[0].uri);
+        console.log('Photo taken with camera:', result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      Alert.alert('Error', 'Failed to take photo with camera.');
+    }
+  };
+
+  const showImagePickerOptions = () => {
     Alert.alert(
-      'Justify Absence',
-      'This will open the absence justification form where you can upload a photo and explain your situation.',
-      [{ text: 'OK' }]
+      'Select Photo',
+      'Choose how you want to add a photo',
+      [
+        { text: 'Camera', onPress: takePhotoWithCamera },
+        { text: 'Gallery', onPress: pickImageFromGallery },
+        { text: 'Cancel', style: 'cancel' }
+      ]
     );
+  };
+
+
+  const handleSubmitJustification = async () => {
+    if (!justificationReason.trim()) {
+      Alert.alert('Error', 'Please provide a reason for your absence.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const justificationData: JustificationSubmission = {
+        absence_id: selectedAbsenceId || 'general',
+        reason: justificationReason,
+        photo_uri: selectedPhoto || undefined,
+        photo_base64: selectedPhoto ? 'mock-base64-data' : undefined
+      };
+      
+      const response = await apiService.submitAbsenceJustification(
+        justificationData.absence_id,
+        justificationData.reason,
+        justificationData.photo_base64 || ''
+      );
+
+      // Update local state to show submitted justification
+      const newJustification = {
+        id: Date.now().toString(),
+        student_id: user?.id,
+        student_name: user?.username || user?.email || 'Student',
+        absence_id: justificationData.absence_id,
+        reason: justificationData.reason,
+        photo_uri: justificationData.photo_uri,
+        status: 'pending',
+        submitted_at: new Date().toISOString(),
+        admin_comment: null
+      };
+      
+      setJustifications(prev => [newJustification, ...prev]);
+
+      Alert.alert(
+        'Success',
+        'Your absence justification has been submitted successfully. You will be notified once it is reviewed.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setShowJustifyModal(false);
+              setJustificationReason('');
+              setSelectedPhoto(null);
+              setSelectedAbsenceId(null);
+              loadAbsences(); // Refresh the list
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error submitting justification:', error);
+      Alert.alert('Error', 'Failed to submit justification. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const loadJustifications = async () => {
+    try {
+      // Mock justifications data - in real app this would come from API
+      const mockJustifications = [
+        {
+          id: '1',
+          student_id: user?.id,
+          student_name: user?.username || user?.email || 'Student',
+          absence_id: 'absence_1',
+          reason: 'Medical appointment',
+          photo_uri: 'mock-photo-1',
+          status: 'approved',
+          submitted_at: '2024-01-15T10:00:00Z',
+          admin_comment: 'Valid medical certificate provided'
+        },
+        {
+          id: '2',
+          student_id: user?.id,
+          student_name: user?.username || user?.email || 'Student',
+          absence_id: 'absence_2',
+          reason: 'Family emergency',
+          photo_uri: null,
+          status: 'pending',
+          submitted_at: '2024-01-20T14:30:00Z',
+          admin_comment: null
+        }
+      ];
+      
+      setJustifications(mockJustifications);
+    } catch (error) {
+      console.error('Error loading justifications:', error);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -56,40 +284,95 @@ export default function AbsencesScreen() {
         <Text style={styles.subtitle}>Track and justify your absences</Text>
       </View>
 
-      <TouchableOpacity style={styles.justifyButton} onPress={handleJustifyAbsence}>
+      <TouchableOpacity style={styles.justifyButton} onPress={() => handleJustifyAbsence()}>
         <MaterialCommunityIcons name="camera-plus" size={24} color="white" />
         <Text style={styles.justifyButtonText}>Justify New Absence</Text>
       </TouchableOpacity>
 
       <View style={styles.absencesList}>
-        {absences.map((absence) => (
-          <View key={absence.id} style={styles.absenceCard}>
-            <View style={styles.absenceHeader}>
-              <View>
-                <Text style={styles.absenceDate}>{absence.date}</Text>
-                <Text style={styles.absenceSession}>{absence.session}</Text>
-              </View>
-              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(absence.status) }]}>
-                <MaterialCommunityIcons 
-                  name={getStatusIcon(absence.status)} 
-                  size={16} 
-                  color="white" 
-                />
-                <Text style={styles.statusText}>{absence.status.toUpperCase()}</Text>
-              </View>
-            </View>
-            
-            <Text style={styles.absenceReason}>{absence.reason}</Text>
-            
-            {absence.hasJustification && (
-              <View style={styles.justificationIndicator}>
-                <MaterialCommunityIcons name="file-document" size={16} color={theme.colors.primary} />
-                <Text style={styles.justificationText}>Justification submitted</Text>
-              </View>
-            )}
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Loading absences...</Text>
           </View>
-        ))}
+        ) : absences.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <MaterialCommunityIcons name="check-circle" size={48} color={theme.colors.success} />
+            <Text style={styles.emptyTitle}>Perfect Attendance!</Text>
+            <Text style={styles.emptyText}>You haven't missed any sessions recently.</Text>
+          </View>
+        ) : (
+          absences.map((absence) => (
+            <View key={absence.id} style={styles.absenceCard}>
+              <View style={styles.absenceHeader}>
+                <View>
+                  <Text style={styles.absenceDate}>{absence.date}</Text>
+                  <Text style={styles.absenceSession}>{absence.subject}</Text>
+                  <Text style={styles.absenceTime}>
+                    {absence.start_time} - {absence.end_time}
+                  </Text>
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(absence.status) }]}>
+                  <MaterialCommunityIcons 
+                    name={getStatusIcon(absence.status)} 
+                    size={16} 
+                    color="white" 
+                  />
+                  <Text style={styles.statusText}>{absence.status.toUpperCase()}</Text>
+                </View>
+              </View>
+              
+              <Text style={styles.absenceReason}>{absence.reason}</Text>
+              
+              {absence.status === 'justified' && (
+                <View style={styles.justificationIndicator}>
+                  <MaterialCommunityIcons name="file-document" size={16} color={theme.colors.primary} />
+                  <Text style={styles.justificationText}>Justification submitted</Text>
+                </View>
+              )}
+            </View>
+          ))
+        )}
       </View>
+
+      {/* My Justifications Section */}
+      {justifications.length > 0 && (
+        <View style={styles.justificationsSection}>
+          <Text style={styles.sectionTitle}>My Justifications</Text>
+          {justifications.map((justification) => (
+            <View key={justification.id} style={styles.justificationCard}>
+              <View style={styles.justificationHeader}>
+                <Text style={styles.justificationReason}>{justification.reason}</Text>
+                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(justification.status) }]}>
+                  <MaterialCommunityIcons 
+                    name={getStatusIcon(justification.status)} 
+                    size={12} 
+                    color="white" 
+                  />
+                  <Text style={styles.statusText}>{justification.status.toUpperCase()}</Text>
+                </View>
+              </View>
+              
+              <Text style={styles.justificationDate}>
+                Submitted: {new Date(justification.submitted_at).toLocaleDateString()}
+              </Text>
+              
+              {justification.photo_uri && (
+                <View style={styles.photoIndicator}>
+                  <MaterialCommunityIcons name="camera" size={16} color={theme.colors.primary} />
+                  <Text style={styles.photoIndicatorText}>Photo attached</Text>
+                </View>
+              )}
+              
+              {justification.admin_comment && (
+                <View style={styles.adminComment}>
+                  <Text style={styles.adminCommentLabel}>Admin Response:</Text>
+                  <Text style={styles.adminCommentText}>{justification.admin_comment}</Text>
+                </View>
+              )}
+            </View>
+          ))}
+        </View>
+      )}
 
       <View style={styles.infoCard}>
         <MaterialCommunityIcons name="information" size={24} color={theme.colors.info} />
@@ -102,6 +385,83 @@ export default function AbsencesScreen() {
           </Text>
         </View>
       </View>
+
+      {/* Justify Absence Modal */}
+      <Modal
+        visible={showJustifyModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowJustifyModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Justify Absence</Text>
+            <TouchableOpacity 
+              onPress={() => setShowJustifyModal(false)}
+              style={styles.closeButton}
+            >
+              <MaterialCommunityIcons name="close" size={24} color={theme.colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalContent}>
+            <Text style={styles.fieldLabel}>Reason for Absence *</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Explain the reason for your absence..."
+              value={justificationReason}
+              onChangeText={setJustificationReason}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+
+            <TouchableOpacity style={styles.photoButton} onPress={showImagePickerOptions}>
+              <MaterialCommunityIcons name={selectedPhoto ? "check-circle" : "camera"} size={24} color={theme.colors.primary} />
+              <Text style={styles.photoButtonText}>
+                {selectedPhoto ? 'Photo Selected ✓' : 'Add Photo (Optional)'}
+              </Text>
+            </TouchableOpacity>
+            
+            {selectedPhoto && (
+              <View style={styles.photoPreview}>
+                <Image 
+                  source={{ uri: selectedPhoto }} 
+                  style={styles.selectedImage}
+                  resizeMode="cover"
+                />
+                <Text style={styles.photoPreviewText}>Photo ready to submit</Text>
+                <TouchableOpacity 
+                  style={styles.removePhotoButton}
+                  onPress={() => setSelectedPhoto(null)}
+                >
+                  <MaterialCommunityIcons name="close-circle" size={20} color={theme.colors.destructive} />
+                  <Text style={styles.removePhotoText}>Remove</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={() => setShowJustifyModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+                onPress={handleSubmitJustification}
+                disabled={isSubmitting}
+              >
+                <Text style={styles.submitButtonText}>
+                  {isSubmitting ? 'Submitting...' : 'Submit'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -112,7 +472,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   header: {
-    backgroundColor: theme.colors.warning,
+    backgroundColor: theme.colors.primary,
     padding: 20,
     paddingTop: 60,
   },
@@ -146,15 +506,12 @@ const styles = StyleSheet.create({
     paddingTop: 0,
   },
   absenceCard: {
-    backgroundColor: 'white',
+    backgroundColor: theme.colors.card,
     borderRadius: 10,
     padding: 15,
     marginBottom: 15,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    borderWidth: 1,
+    borderColor: theme.colors["card-border"],
   },
   absenceHeader: {
     flexDirection: 'row',
@@ -181,7 +538,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   statusText: {
-    color: 'white',
+    color: theme.colors["primary-foreground"],
     fontSize: 10,
     fontWeight: 'bold',
   },
@@ -201,17 +558,14 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   infoCard: {
-    backgroundColor: 'white',
+    backgroundColor: theme.colors.card,
     margin: 20,
     padding: 15,
     borderRadius: 10,
     flexDirection: 'row',
     gap: 15,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    borderWidth: 1,
+    borderColor: theme.colors["card-border"],
   },
   infoContent: {
     flex: 1,
@@ -226,5 +580,224 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.textSecondary,
     lineHeight: 20,
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: 60,
+    backgroundColor: theme.colors.primary,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  closeButton: {
+    padding: 5,
+  },
+  modalContent: {
+    flex: 1,
+    padding: 20,
+  },
+  fieldLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    marginBottom: 8,
+  },
+  textInput: {
+    backgroundColor: theme.colors.card,
+    borderRadius: 10,
+    padding: 15,
+    fontSize: 16,
+    color: theme.colors.text,
+    borderWidth: 1,
+    borderColor: theme.colors["card-border"],
+    marginBottom: 20,
+    minHeight: 100,
+  },
+  photoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.card,
+    borderRadius: 10,
+    padding: 15,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
+    borderStyle: 'dashed',
+    marginBottom: 30,
+    gap: 10,
+  },
+  photoButtonText: {
+    fontSize: 16,
+    color: theme.colors.primary,
+    fontWeight: '500',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 15,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: theme.colors.card,
+    borderRadius: 10,
+    padding: 15,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    color: theme.colors.text,
+    fontWeight: '500',
+  },
+  submitButton: {
+    flex: 1,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 10,
+    padding: 15,
+    alignItems: 'center',
+  },
+  submitButtonDisabled: {
+    backgroundColor: theme.colors.textSecondary,
+  },
+  submitButtonText: {
+    fontSize: 16,
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  // Loading and empty states
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: theme.colors.textSecondary,
+  },
+  emptyContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    marginTop: 15,
+    marginBottom: 5,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+  },
+  absenceTime: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  // New styles for justifications and photo upload
+  justificationsSection: {
+    padding: 20,
+    paddingTop: 0,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    marginBottom: 15,
+  },
+  justificationCard: {
+    backgroundColor: theme.colors.card,
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: theme.colors["card-border"],
+  },
+  justificationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  justificationReason: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: theme.colors.text,
+    flex: 1,
+    marginRight: 10,
+  },
+  justificationDate: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    marginBottom: 8,
+  },
+  photoIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 8,
+  },
+  photoIndicatorText: {
+    fontSize: 12,
+    color: theme.colors.primary,
+    fontStyle: 'italic',
+  },
+  adminComment: {
+    backgroundColor: theme.colors.background,
+    padding: 10,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.primary,
+  },
+  adminCommentLabel: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: theme.colors.primary,
+    marginBottom: 4,
+  },
+  adminCommentText: {
+    fontSize: 14,
+    color: theme.colors.text,
+    lineHeight: 18,
+  },
+  photoPreview: {
+    backgroundColor: theme.colors.card,
+    borderRadius: 10,
+    padding: 15,
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+  },
+  selectedImage: {
+    width: 200,
+    height: 150,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  photoPreviewText: {
+    fontSize: 14,
+    color: theme.colors.text,
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  removePhotoButton: {
+    backgroundColor: theme.colors.error,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  removePhotoText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '500',
   },
 });

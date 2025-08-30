@@ -12,9 +12,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../constants/theme';
 import FaceRecognitionCamera from './FaceRecognitionCamera';
-import { FaceRecognitionResult } from '../services/faceRecognition';
 import { useAuth } from '../contexts/AuthContext';
-import apiService from '../services/api';
+import faceRecognitionService from '../services/faceRecognitionService';
+
+interface FaceRecognitionResult {
+  success: boolean;
+  error?: string;
+  faceEncoding?: string;
+  confidence?: number;
+}
 
 interface FaceRegistrationProps {
   visible: boolean;
@@ -44,31 +50,36 @@ export default function FaceRegistration({ visible, onClose, onSuccess }: FaceRe
       setRegistrationStep('processing');
       setShowCamera(false);
 
-      // Save face encoding to user profile
-      await apiService.updateProfile({
-        face_encoding: result.faceEncoding,
-      });
-
-      // Show success message
-      Alert.alert(
-        'Face Registered Successfully!',
-        'You can now use face recognition to log in quickly and mark attendance.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              onSuccess();
-              onClose();
-            }
-          }
-        ]
+      // Register face using the face recognition service
+      const registrationResult = await faceRecognitionService.registerFace(
+        result.faceEncoding,
+        user.id
       );
+
+      if (registrationResult.success) {
+        // Show success message
+        Alert.alert(
+          'Face Registered Successfully!',
+          'You can now use face recognition to log in quickly and mark attendance.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                onSuccess();
+                onClose();
+              }
+            }
+          ]
+        );
+      } else {
+        throw new Error(registrationResult.error || 'Registration failed');
+      }
 
     } catch (error: any) {
       console.error('Face registration error:', error);
       Alert.alert(
         'Registration Failed',
-        error.response?.data?.error || error.message || 'Failed to register face. Please try again.'
+        error.message || 'Failed to register face. Please try again.'
       );
       setRegistrationStep('intro');
     } finally {

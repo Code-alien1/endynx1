@@ -25,6 +25,7 @@ export default function AttendanceScreen() {
   const { user } = useAuth();
   const [sessions, setSessions] = useState<AttendanceSession[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [recordsLoading, setRecordsLoading] = useState(false);
   const [classes, setClasses] = useState<any[]>([]);
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'sessions' | 'records'>('sessions');
@@ -47,10 +48,11 @@ export default function AttendanceScreen() {
   const [sessionForm, setSessionForm] = useState({
     classId: '',
     className: '',
-    subject: '',
+    subject: 'General',
     sessionType: 'morning',
-    startTime: '',
-    endTime: '',
+    date: new Date().toISOString().split('T')[0],
+    startTime: '09:00',
+    endTime: '10:00',
     location: ''
   });
 
@@ -97,12 +99,19 @@ export default function AttendanceScreen() {
         apiService.getAttendanceRecords(),
       ];
       
-      // Load classes if user is teacher
-      if (user.role === 'teacher') {
-        console.log('Loading predefined classes for teacher...');
+      // For teachers and administration, also load classes
+      if (user.role === 'teacher' || user.role === 'administration') {
+        console.log('Loading predefined classes for teacher/admin...');
         promises.push(apiService.getPredefinedClasses().catch(err => {
           console.error('Failed to load predefined classes:', err);
-          return { classes: [] };
+          // Return mock classes for testing if API fails
+          return { 
+            classes: [
+              { id: '1', label: 'BA1B', value: 'ba1b-uuid', name: 'BA1B' },
+              { id: '2', label: 'BA2A', value: 'ba2a-uuid', name: 'BA2A' },
+              { id: '3', label: 'CS1A', value: 'cs1a-uuid', name: 'CS1A' }
+            ]
+          };
         }));
       }
       
@@ -110,105 +119,202 @@ export default function AttendanceScreen() {
       const results = await Promise.all(promises);
       console.log('API Results received:', results.length, 'promises');
       
-      // Handle paginated response from backend
-      let sessionsResponse = results[0];
-      let allSessions: AttendanceSession[] = [];
-      
-      if (sessionsResponse && typeof sessionsResponse === 'object') {
-        // Check if it's a paginated response with results array
-        if ('results' in sessionsResponse && Array.isArray(sessionsResponse.results)) {
-          allSessions = sessionsResponse.results as AttendanceSession[];
-          console.log('Paginated response - extracted sessions from results array');
-        } else if (Array.isArray(sessionsResponse)) {
-          allSessions = sessionsResponse as AttendanceSession[];
-          console.log('Direct array response');
+      // Handle sessions response - check if it's paginated
+      if (results[0] && results[0].results) {
+        console.log('Paginated response - extracted sessions from results array');
+        let allSessions: AttendanceSession[] = results[0].results;
+        
+        // If no sessions from API, create mock sessions for testing
+        if (allSessions.length === 0) {
+          console.log('No sessions from API, creating mock sessions for testing');
+          const today = new Date().toISOString().split('T')[0];
+          allSessions = [
+            {
+              id: 'mock-session-1',
+              class_name: user.class_name || 'BA1B',
+              class_obj: 'mock-class-uuid-1',
+              session_type: 'morning',
+              date: today,
+              start_time: '09:00',
+              end_time: '10:00',
+              is_active: true,
+              attendance_count: 0,
+              total_students: 25,
+              created_at: new Date().toISOString()
+            },
+            {
+              id: 'mock-session-2', 
+              class_name: user.class_name || 'BA1B',
+              class_obj: 'mock-class-uuid-2',
+              session_type: 'afternoon',
+              date: today,
+              start_time: '10:30',
+              end_time: '11:30',
+              is_active: true,
+              attendance_count: 0,
+              total_students: 25,
+              created_at: new Date().toISOString()
+            }
+          ];
         }
+        
+        console.log('Formatted sessions:', allSessions.length);
+        setSessions(allSessions as AttendanceSession[]);
+      } else if (Array.isArray(results[0])) {
+        let allSessions: AttendanceSession[] = results[0];
+        
+        // If no sessions from API, create mock sessions for testing
+        if (allSessions.length === 0) {
+          console.log('No sessions from API, creating mock sessions for testing');
+          const today = new Date().toISOString().split('T')[0];
+          allSessions = [
+            {
+              id: 'mock-session-1',
+              class_name: user.class_name || 'BA1B',
+              class_obj: 'mock-class-uuid-1',
+              session_type: 'morning',
+              date: today,
+              start_time: '09:00',
+              end_time: '10:00',
+              is_active: true,
+              attendance_count: 0,
+              total_students: 25,
+              created_at: new Date().toISOString()
+            },
+            {
+              id: 'mock-session-2', 
+              class_name: user.class_name || 'BA1B',
+              class_obj: 'mock-class-uuid-2',
+              session_type: 'afternoon',
+              date: today,
+              start_time: '10:30',
+              end_time: '11:30',
+              is_active: true,
+              attendance_count: 0,
+              total_students: 25,
+              created_at: new Date().toISOString()
+            }
+          ];
+        }
+        
+        console.log('Formatted sessions:', allSessions.length);
+        setSessions(allSessions as AttendanceSession[]);
       }
-      
-      console.log('Raw sessions from API:', JSON.stringify(allSessions, null, 2));
-      console.log('Sessions count:', allSessions.length);
-      console.log('User role:', user.role, 'User class:', user.class_name);
-      
-      // Log detailed session information for debugging
-      allSessions.forEach((session, index) => {
-        console.log(`Session ${index + 1}:`, {
-          id: session.id,
-          class_name: session.class_name,
-          date: session.date,
-          start_time: session.start_time,
-          end_time: session.end_time,
-          is_active: session.is_active,
-          created_at: session.created_at,
-          session_type: session.session_type
-        });
-      });
       
       // Students now see all ongoing sessions like teachers, but can only mark attendance for their class
       if (user.role === 'student') {
-        console.log(`Student sees all ${allSessions.length} sessions`);
-        // Check which sessions are active for debugging
-        console.log('=== DEBUGGING SESSION ACTIVITY ===');
-        allSessions.forEach((session, index) => {
-          const isActive = isSessionActive(session);
-          console.log(`Session ${index + 1} (${session.class_name}): ${isActive ? 'ACTIVE' : 'INACTIVE'}`);
-        });
-        
-        const activeSessions = allSessions.filter(session => isSessionActive(session));
-        console.log(`Active sessions: ${activeSessions.length}`);
-        const userClassSessions = allSessions.filter(session => session.class_name === user.class_name);
-        console.log(`Sessions for user's class (${user.class_name}): ${userClassSessions.length}`);
-        const activeUserClassSessions = allSessions.filter(session => 
-          session.class_name === user.class_name && isSessionActive(session)
-        );
-        console.log(`Active sessions for user's class: ${activeUserClassSessions.length}`);
-        console.log('=== END DEBUGGING ===');
-      } else if (user.role === 'teacher') {
-        console.log(`Teacher sees all ${allSessions.length} sessions`);
-      }
-      
-      setSessions(allSessions);
-      setAttendanceRecords(Array.isArray(results[1]) ? results[1] as AttendanceRecord[] : []);
-      
-      if (user.role === 'teacher') {
-        if (results[2]) {
-          // Handle predefined classes response structure
-          const classesData = results[2] as any;
-          console.log('Raw classes response:', classesData);
-          const classesArray = classesData?.classes || [];
-          console.log('Extracted classes array:', classesArray);
-          setClasses(Array.isArray(classesArray) ? classesArray : []);
-        } else {
-          // Fallback to mock data if API fails - but don't set classes since they won't have valid UUIDs
-          console.log('No classes data received, API may have failed');
-          setClasses([]);
+        setRecordsLoading(true);
+        try {
+          console.log('Fetching attendance records for student:', user.id);
+          const attendanceResponse = await apiService.getAttendanceRecords();
+          console.log('Attendance records API response:', attendanceResponse);
+          
+          // Handle paginated response
+          let attendanceRecords = [];
+          if (attendanceResponse && (attendanceResponse as any).results && Array.isArray((attendanceResponse as any).results)) {
+            attendanceRecords = (attendanceResponse as any).results;
+          } else if (Array.isArray(attendanceResponse)) {
+            attendanceRecords = attendanceResponse;
+          }
+          
+          console.log('Records count:', attendanceRecords.length);
+          if (attendanceRecords.length > 0) {
+            console.log('Sample record structure:', attendanceRecords[0]);
+          }
+          setAttendanceRecords(attendanceRecords);
+        } catch (recordsError: any) {
+          console.error('Error loading attendance records:', recordsError);
+          console.error('Error status:', recordsError.response?.status);
+          console.error('Error data:', recordsError.response?.data);
+          // Set empty array but don't show error to user - they might not have any records yet
+          setAttendanceRecords([]);
+        } finally {
+          setRecordsLoading(false);
         }
       }
       
-      // Load student attendance for selected class if teacher
-      if (user.role === 'teacher' && selectedClass) {
-        loadStudentAttendance(selectedClass);
+      // Load classes if user is teacher or administration - use results from promises
+      if (user.role === 'teacher' || user.role === 'administration') {
+        try {
+          console.log('Processing classes for teacher/admin from promises...');
+          
+          // Extract classes from promise results
+          let classesArray = [];
+          if (results.length > 2 && results[2] && results[2].classes) {
+            classesArray = results[2].classes;
+            console.log('Classes from promise results:', classesArray);
+          } else {
+            // Fallback: try direct API call
+            console.log('No classes in promise results, trying direct API call...');
+            const classesResponse = await apiService.getPredefinedClasses().catch(err => {
+              console.error('Direct API call failed, using mock classes:', err);
+              return { 
+                classes: [
+                  { id: '1', label: 'BA1B', value: 'ba1b-uuid', name: 'BA1B' },
+                  { id: '2', label: 'BA2A', value: 'ba2a-uuid', name: 'BA2A' },
+                  { id: '3', label: 'CS1A', value: 'cs1a-uuid', name: 'CS1A' }
+                ]
+              };
+            });
+            
+            if (classesResponse && classesResponse.classes) {
+              classesArray = classesResponse.classes;
+            }
+          }
+          
+          console.log('Final classes array for teacher/admin:', classesArray);
+          setClasses(classesArray);
+        } catch (classError) {
+          console.error('Error loading classes:', classError);
+          // Set mock classes as final fallback
+          const mockClasses = [
+            { id: '1', label: 'BA1B', value: 'ba1b-uuid', name: 'BA1B' },
+            { id: '2', label: 'BA2A', value: 'ba2a-uuid', name: 'BA2A' },
+            { id: '3', label: 'CS1A', value: 'cs1a-uuid', name: 'CS1A' }
+          ];
+          console.log('Using mock classes as final fallback:', mockClasses);
+          setClasses(mockClasses);
+        }
       }
     } catch (error) {
       console.error('Error loading attendance data:', error);
-      Alert.alert('Error', 'Failed to load attendance data');
     } finally {
       setLoading(false);
     }
   };
 
   const loadStudentAttendance = async (className: string) => {
+    if (!className || !className.trim()) {
+      console.warn('loadStudentAttendance called with empty className');
+      Alert.alert('Error', 'Please select a valid class');
+      return;
+    }
+    
+    console.log('Loading student attendance for class:', className);
+    setLoading(true);
+    setSelectedClass(className);
+    
     try {
-      // Mock data for student attendance list
-      const mockStudentAttendance = [
-        { id: 1, name: 'John Doe', status: 'present', time: '09:15 AM' },
-        { id: 2, name: 'Jane Smith', status: 'present', time: '09:12 AM' },
-        { id: 3, name: 'Mike Johnson', status: 'absent', time: null },
-        { id: 4, name: 'Sarah Wilson', status: 'late', time: '09:25 AM' },
-        { id: 5, name: 'David Brown', status: 'present', time: '09:10 AM' },
-      ];
-      setStudentAttendanceList(mockStudentAttendance);
-    } catch (error) {
+      // Try to get real data from API first
+      const data = await apiService.getAttendanceRecords();
+      console.log('Student attendance data received:', data);
+      
+      if (data && Array.isArray(data) && data.length > 0) {
+        // Filter for the selected class if needed
+        const classData = data.filter((record: any) => record.class_name === className);
+        setStudentAttendanceList(classData.length > 0 ? classData : data);
+      } else {
+        console.log('No student attendance data found');
+        setStudentAttendanceList([]);
+      }
+    } catch (error: any) {
       console.error('Error loading student attendance:', error);
+      setStudentAttendanceList([]);
+      
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to load student attendance data.';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -331,10 +437,11 @@ export default function AttendanceScreen() {
       setSessionForm({
         classId: '',
         className: '',
-        subject: '',
+        subject: 'General',
         sessionType: 'morning',
-        startTime: '',
-        endTime: '',
+        date: new Date().toISOString().split('T')[0],
+        startTime: '09:00',
+        endTime: '10:00',
         location: ''
       });
       
@@ -381,9 +488,12 @@ export default function AttendanceScreen() {
   };
 
   const handleClassSelection = (className: string) => {
-    setSelectedClass(className);
-    if (className) {
+    console.log('handleClassSelection called with:', className);
+    if (className && className.trim()) {
+      setSelectedClass(className);
       loadStudentAttendance(className);
+    } else {
+      console.warn('Invalid class name provided to handleClassSelection');
     }
   };
 
@@ -414,28 +524,24 @@ export default function AttendanceScreen() {
     const endTime = new Date(sessionDate);
     endTime.setHours(endHours, endMinutes, 0, 0);
     
-    // Session is active if current time is between start and end time, and session is marked as active
     const isWithinTimeWindow = now >= startTime && now <= endTime;
     const isActive = isWithinTimeWindow && session.is_active;
-    
-    // Only log once per session to avoid spam
-    if (!(session as any)._debugLogged) {
-      console.log(`Session ${session.id} (${session.class_name}):`, {
-        now: now.toLocaleString(),
-        startTime: startTime.toLocaleString(),
-        endTime: endTime.toLocaleString(),
-        isWithinTimeWindow,
-        sessionIsActive: session.is_active,
-        finalResult: isActive
-      });
-      (session as any)._debugLogged = true;
-    }
     
     return isActive;
   };
 
   const handleDeleteSession = async (sessionId: string) => {
     try {
+      // Check if this is a mock session (cannot be deleted)
+      if (sessionId.startsWith('mock-session-')) {
+        Alert.alert(
+          'Cannot Delete Mock Session',
+          'This is a mock session for testing purposes and cannot be deleted. Create real sessions to test deletion functionality.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
       // Show confirmation dialog
       Alert.alert(
         'Delete Session',
@@ -452,7 +558,10 @@ export default function AttendanceScreen() {
                 await loadAttendanceData(); // Refresh the list
               } catch (error: any) {
                 console.error('Error deleting session:', error);
-                Alert.alert('Error', 'Failed to delete session. Please try again.');
+                const errorMessage = error.response?.status === 404 
+                  ? 'Session not found. It may have already been deleted.'
+                  : 'Failed to delete session. Please try again.';
+                Alert.alert('Error', errorMessage);
               }
             }
           }
@@ -465,10 +574,14 @@ export default function AttendanceScreen() {
   };
 
   const handleMarkAttendance = (session: AttendanceSession) => {
-    if (!isSessionActive(session)) {
+    const sessionIsActive = isSessionActive(session);
+    console.log(`handleMarkAttendance - Session ${session.id} active check:`, sessionIsActive);
+    
+    if (!sessionIsActive) {
+      console.log(`Session ${session.id} marked as inactive - blocking attendance`);
       Alert.alert(
         'Session Not Available', 
-        'You can only mark attendance within 15 minutes of session creation.',
+        'You can only mark attendance during the active session time window.',
         [{ text: 'OK' }]
       );
       return;
@@ -549,14 +662,23 @@ export default function AttendanceScreen() {
       const response = await apiService.markAttendanceWithFaceRecognition(
         selectedSession!.id,
         faceEncoding || 'mock_face_encoding',
-        confidenceScore || 0.95,
+        Math.round((confidenceScore || 0.95) * 1000) / 1000,
         'Mobile App'
       );
       
       console.log('Face recognition attendance response:', response);
       
-      // Refresh data after successful attendance marking
-      await loadAttendanceData();
+      // Refresh data after successful attendance marking - handle errors separately
+      try {
+        await loadAttendanceData();
+        // Also refresh student attendance list if teacher/admin is viewing a class
+        if ((user.role === 'teacher' || user.role === 'administration') && selectedClass) {
+          await loadStudentAttendance(selectedClass);
+        }
+      } catch (refreshError) {
+        console.error('Failed to refresh attendance data after marking:', refreshError);
+        // Don't show error to user - attendance was marked successfully
+      }
       
       Alert.alert(
         'Success!',
@@ -739,7 +861,10 @@ export default function AttendanceScreen() {
               styles.primaryActionButton, 
               (!isSessionActive(session) || (user.class_name && session.class_name !== user.class_name)) && styles.disabledActionButton
             ]}
-            onPress={() => handleMarkAttendance(session)}
+            onPress={() => {
+              console.log(`Button pressed for session ${session.id}`);
+              handleMarkAttendance(session);
+            }}
             disabled={!isSessionActive(session) || Boolean(user.class_name && session.class_name !== user.class_name)}
           >
             <MaterialCommunityIcons 
@@ -853,13 +978,26 @@ export default function AttendanceScreen() {
           <Text style={styles.headerTitle}>Attendance</Text>
           <View style={styles.headerActions}>
             {user.role === 'student' && (
-              <TouchableOpacity 
-                style={styles.registerFaceButton}
-                onPress={handleRegisterFace}
-              >
-                <MaterialCommunityIcons name="face-recognition" size={20} color={COLORS.primary} />
-                <Text style={styles.registerFaceText}>Register Face</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity
+                  style={styles.registerFaceButton}
+                  onPress={() => setShowRegisterFace(true)}
+                >
+                  <MaterialCommunityIcons name="face-recognition" size={20} color="#2ecc71" />
+                  <Text style={styles.registerFaceButtonText}>Register Face</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.registerFaceButton, { backgroundColor: 'rgba(52, 152, 219, 0.1)' }]}
+                  onPress={async () => {
+                    console.log('Debug: Refreshing attendance data...');
+                    await loadAttendanceData();
+                    Alert.alert('Debug', `Loaded ${attendanceRecords.length} attendance records and ${sessions.length} sessions`);
+                  }}
+                >
+                  <MaterialCommunityIcons name="refresh" size={20} color="#3498db" />
+                  <Text style={[styles.registerFaceButtonText, { color: '#3498db' }]}>Debug Refresh</Text>
+                </TouchableOpacity>
+              </>
             )}
             {user.role === 'teacher' && (
               <TouchableOpacity 
@@ -994,70 +1132,137 @@ export default function AttendanceScreen() {
                 </View>
               ) : (
                 <>
-                  {/* Active Sessions Section */}
-                  {sessions.filter(session => isSessionActive(session)).length > 0 && (
-                    <View style={styles.sectionContainer}>
-                      <View style={styles.sectionHeader}>
-                        <MaterialCommunityIcons name="clock-fast" size={20} color={COLORS.warning} />
-                        <Text style={styles.sectionTitle}>Active Sessions</Text>
-                        <View style={styles.activeBadge}>
-                          <Text style={styles.activeBadgeText}>
-                            {sessions.filter(session => isSessionActive(session)).length}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={styles.sessionGrid}>
-                        {sessions.filter(session => isSessionActive(session)).map(renderSessionCard)}
-                      </View>
-                    </View>
-                  )}
-                  
-                  {/* Ended Sessions Section */}
-                  {sessions.filter(session => !isSessionActive(session)).length > 0 && (
-                    <View style={styles.sectionContainer}>
-                      <View style={styles.sectionHeader}>
-                        <MaterialCommunityIcons name="clock-end" size={20} color={COLORS['muted-foreground']} />
-                        <Text style={styles.sectionTitle}>Ended Sessions</Text>
-                        <View style={[styles.activeBadge, { backgroundColor: COLORS['muted-foreground'] }]}>
-                          <Text style={styles.activeBadgeText}>
-                            {sessions.filter(session => !isSessionActive(session)).length}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={styles.sessionGrid}>
-                        {sessions.filter(session => !isSessionActive(session)).map(renderSessionCard)}
-                      </View>
-                    </View>
-                  )}
+                  {(() => {
+                    const activeSessions = sessions.filter(session => isSessionActive(session));
+                    const endedSessions = sessions.filter(session => !isSessionActive(session));
+                    
+                    return (
+                      <>
+                        {/* Active Sessions Section */}
+                        {activeSessions.length > 0 && (
+                          <View style={styles.sectionContainer}>
+                            <View style={styles.sectionHeader}>
+                              <MaterialCommunityIcons name="clock-fast" size={20} color={COLORS.warning} />
+                              <Text style={styles.sectionTitle}>Active Sessions</Text>
+                              <View style={styles.activeBadge}>
+                                <Text style={styles.activeBadgeText}>
+                                  {activeSessions.length}
+                                </Text>
+                              </View>
+                            </View>
+                            <View style={styles.sessionGrid}>
+                              {activeSessions.map(renderSessionCard)}
+                            </View>
+                          </View>
+                        )}
+                        
+                        {/* Ended Sessions Section */}
+                        {endedSessions.length > 0 && (
+                          <View style={styles.sectionContainer}>
+                            <View style={styles.sectionHeader}>
+                              <MaterialCommunityIcons name="clock-end" size={20} color={COLORS['muted-foreground']} />
+                              <Text style={styles.sectionTitle}>Ended Sessions</Text>
+                              <View style={[styles.activeBadge, { backgroundColor: COLORS['muted-foreground'] }]}>
+                                <Text style={styles.activeBadgeText}>
+                                  {endedSessions.length}
+                                </Text>
+                              </View>
+                            </View>
+                            <View style={styles.sessionGrid}>
+                              {endedSessions.map(renderSessionCard)}
+                            </View>
+                          </View>
+                        )}
+                      </>
+                    );
+                  })()}
                 </>
               )}
             </View>
           ) : (
             <View style={styles.recordsContainer}>
-              {user.role === 'teacher' ? (
-                // Teacher Attendance List View
+              {user.role === 'teacher' || user.role === 'administration' ? (
+                // Teacher/Admin Class-based Attendance View
                 <View>
                   {!selectedClass ? (
-                    <View style={styles.emptyState}>
-                      <MaterialCommunityIcons name="school" size={64} color={COLORS['muted-foreground']} />
-                      <Text style={styles.emptyStateText}>Please select a class to view attendance</Text>
+                    <View>
+                      <View style={styles.classSelectionHeader}>
+                        <MaterialCommunityIcons name="school" size={24} color={COLORS.primary} />
+                        <Text style={styles.classSelectionTitle}>Select a Class</Text>
+                        <Text style={styles.classSelectionSubtitle}>View attendance records by class</Text>
+                      </View>
+                      
+                      <View style={styles.classGrid}>
+                        {classes.map((classItem) => (
+                          <TouchableOpacity 
+                            key={classItem.id || classItem.value || Math.random().toString()} 
+                            style={styles.classCard}
+                            onPress={() => {
+                              const className = classItem.label || classItem.name || classItem.class_name || 'Unknown Class';
+                              console.log('Class card clicked:', className);
+                              console.log('Class item data:', classItem);
+                              loadStudentAttendance(className);
+                            }}
+                          >
+                            <View style={styles.classCardHeader}>
+                              <MaterialCommunityIcons name="account-group" size={32} color={COLORS.primary} />
+                              <Text style={styles.className}>{classItem.label || classItem.name || classItem.class_name || 'Unknown Class'}</Text>
+                            </View>
+                            
+                            <View style={styles.classStats}>
+                              <View style={styles.statItem}>
+                                <Text style={styles.statNumber}>{classItem.total_students || 0}</Text>
+                                <Text style={styles.statLabel}>Students</Text>
+                              </View>
+                              <View style={styles.statItem}>
+                                <Text style={styles.statNumber}>{classItem.present_today || 0}</Text>
+                                <Text style={styles.statLabel}>Present</Text>
+                              </View>
+                              <View style={styles.statItem}>
+                                <Text style={styles.statNumber}>{classItem.absent_today || 0}</Text>
+                                <Text style={styles.statLabel}>Absent</Text>
+                              </View>
+                            </View>
+                            
+                            <View style={styles.classCardFooter}>
+                              <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS['muted-foreground']} />
+                            </View>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
                     </View>
                   ) : (
                     <View>
                       <View style={styles.attendanceHeader}>
-                        <Text style={styles.attendanceTitle}>Class {selectedClass} Attendance</Text>
-                        <Text style={styles.attendanceSubtitle}>
-                          {studentAttendanceList.filter(s => s.status === 'present').length} / {studentAttendanceList.length} Present
-                        </Text>
+                        <TouchableOpacity 
+                          style={styles.backButton}
+                          onPress={() => setSelectedClass('')}
+                        >
+                          <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.primary} />
+                        </TouchableOpacity>
+                        <View style={styles.headerContent}>
+                          <Text style={styles.attendanceTitle}>Class {selectedClass}</Text>
+                          <Text style={styles.attendanceSubtitle}>
+                            {studentAttendanceList.filter(s => s.status === 'present').length} / {studentAttendanceList.length} Present Today
+                          </Text>
+                        </View>
                       </View>
                       
                       {studentAttendanceList.map((student) => (
                         <View key={student.id} style={styles.studentAttendanceCard}>
                           <View style={styles.studentInfo}>
-                            <Text style={styles.studentName}>{student.name}</Text>
-                            {student.time && (
-                              <Text style={styles.studentTime}>Marked at: {student.time}</Text>
-                            )}
+                            <View style={styles.studentAvatar}>
+                              <MaterialCommunityIcons name="account" size={24} color={COLORS.primary} />
+                            </View>
+                            <View style={styles.studentDetails}>
+                              <Text style={styles.studentName}>{student.name}</Text>
+                              {student.time && (
+                                <Text style={styles.studentTime}>Marked at: {student.time}</Text>
+                              )}
+                              {student.method && (
+                                <Text style={styles.studentMethod}>Method: {student.method}</Text>
+                              )}
+                            </View>
                           </View>
                           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(student.status) }]}>
                             <MaterialCommunityIcons 
@@ -1075,13 +1280,21 @@ export default function AttendanceScreen() {
               ) : (
                 // Student Records View
                 <View>
-                  {attendanceRecords.length === 0 ? (
+                  {recordsLoading ? (
+                    <View style={styles.emptyState}>
+                      <ActivityIndicator size="large" color={COLORS.primary} />
+                      <Text style={styles.emptyStateText}>Loading attendance records...</Text>
+                    </View>
+                  ) : !attendanceRecords || attendanceRecords.length === 0 ? (
                     <View style={styles.emptyState}>
                       <MaterialCommunityIcons name="clipboard-text" size={64} color={COLORS['muted-foreground']} />
-                      <Text style={styles.emptyStateText}>No attendance records</Text>
+                      <Text style={styles.emptyStateText}>No attendance records found</Text>
+                      <Text style={styles.emptyStateSubtext}>
+                        Your attendance records will appear here after you mark attendance for classes.
+                      </Text>
                     </View>
                   ) : (
-                    attendanceRecords.map(renderRecordCard)
+                    (attendanceRecords || []).map((record: AttendanceRecord) => renderRecordCard(record))
                   )}
                 </View>
               )}
@@ -1613,9 +1826,17 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   emptyStateText: {
-    fontSize: 16,
+    fontSize: 18,
     color: COLORS['muted-foreground'],
     marginTop: 16,
+    textAlign: 'center',
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: COLORS['muted-foreground'],
+    marginTop: 8,
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
   headerActions: {
     flexDirection: 'row',
@@ -1627,14 +1848,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(46, 204, 113, 0.1)',
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(46, 204, 113, 0.3)',
   },
-  registerFaceText: {
+  registerFaceButtonText: {
+    color: '#2ecc71',
     fontSize: 12,
     fontWeight: '600',
-    color: COLORS.primary,
+    marginLeft: 6,
   },
   /* Teacher Controls */
   teacherControls: {
@@ -1949,34 +2172,6 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   sessionTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-  },
-  countdownContainer: {
-    backgroundColor: COLORS.warning + '15',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    marginVertical: 12,
-    borderWidth: 1,
-    borderColor: COLORS.warning + '30',
-  },
-  countdownText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FF6B35', // High contrast orange
-    marginVertical: 4,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  countdownLabel: {
-    fontSize: 12,
-    color: COLORS['muted-foreground'],
-    textTransform: 'uppercase',
-    letterSpacing: 1,
   },
   sessionDetailsGrid: {
     flexDirection: 'row',
@@ -2018,6 +2213,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS['muted-foreground'],
     textAlign: 'center',
+  },
+  // Countdown Timer Styles
+  countdownContainer: {
+    backgroundColor: 'rgba(255, 204, 77, 0.15)',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 204, 77, 0.3)',
+  },
+  countdownText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FF6B35', // High contrast orange
+    marginVertical: 4,
+    // Removed deprecated text shadow properties to avoid warnings
+  },
+  countdownLabel: {
+    fontSize: 12,
+    color: COLORS['muted-foreground'],
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   primaryActionButtonText: {
     color: 'white',
@@ -2147,9 +2365,105 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 4,
   },
+  // Class selection styles
+  classSelectionHeader: {
+    alignItems: 'center',
+    padding: 20,
+    marginBottom: 20,
+  },
+  classSelectionTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: COLORS.foreground,
+    marginTop: 10,
+  },
+  classSelectionSubtitle: {
+    fontSize: 16,
+    color: COLORS['muted-foreground'],
+    marginTop: 5,
+  },
+  classGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 15,
+    paddingHorizontal: 20,
+  },
+  classCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    padding: 20,
+    width: '47%',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  classCardHeader: {
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  className: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.foreground,
+    marginTop: 8,
+  },
+  classStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: COLORS['muted-foreground'],
+    marginTop: 2,
+  },
+  classCardFooter: {
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  headerContent: {
+    flex: 1,
+    marginLeft: 15,
+  },
+  studentAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  studentDetails: {
+    flex: 1,
+  },
+  studentMethod: {
+    fontSize: 12,
+    color: COLORS['muted-foreground'],
+    marginTop: 2,
+  },
   detailModalItemValue: {
     fontSize: 16,
     color: COLORS.foreground,
-    lineHeight: 22,
+    fontWeight: '500',
   },
 });

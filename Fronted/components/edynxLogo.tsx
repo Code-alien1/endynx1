@@ -7,8 +7,9 @@ interface EdynxLogoProps {
   shouldSpin?: boolean; // New prop to control spinning
 }
 
-const EdynxLogo: React.FC<EdynxLogoProps> = ({ size = 'md', style, shouldSpin = true }) => {
+const EdynxLogo: React.FC<EdynxLogoProps> = ({ size = 'md', style, shouldSpin = false }) => {
   const spinValue = useRef(new Animated.Value(0)).current;
+  // Explicitly type the animation ref to avoid TS inferring 'never'
   const animation = useRef<Animated.CompositeAnimation | null>(null);
   const isAnimating = useRef(false);
 

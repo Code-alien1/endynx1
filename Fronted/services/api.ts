@@ -8,7 +8,7 @@ const resolveApiBaseUrl = (): string => {
   const envUrl = (process as any)?.env?.EXPO_PUBLIC_API_URL as string | undefined;
   if (envUrl && typeof envUrl === 'string') {
     // Normalize: remove trailing slash
-    return envUrl.replace(/\/$/, '');
+    return "http://192.168.83.107:8000/api";
   }
   
   // For development, use your computer's IP address
@@ -326,6 +326,57 @@ class ApiService {
     await this.api.delete(`/attendance/sessions/${sessionId}/`);
   }
 
+  // Admin API methods
+  async getAllUsers(): Promise<any[]> {
+    const response = await this.api.get('/admin/users/');
+    return response.data;
+  }
+
+  async createUser(userData: any): Promise<any> {
+    const response = await this.api.post('/admin/users/', userData);
+    return response.data;
+  }
+
+  async updateUser(userId: string, userData: any): Promise<any> {
+    const response = await this.api.put(`/admin/users/${userId}/`, userData);
+    return response.data;
+  }
+
+  async deleteUser(userId: string): Promise<void> {
+    await this.api.delete(`/admin/users/${userId}/`);
+  }
+
+  async getAllJustifications(): Promise<any[]> {
+    const response = await this.api.get('/admin/justifications/');
+    return response.data;
+  }
+
+  async updateJustificationStatus(justificationId: string, status: string): Promise<any> {
+    const response = await this.api.patch(`/admin/justifications/${justificationId}/`, { status });
+    return response.data;
+  }
+
+  async getAllAnnouncements(): Promise<any[]> {
+    const response = await this.api.get('/announcements/');
+    return response.data;
+  }
+
+  async createAnnouncement(announcementData: any): Promise<any> {
+    const response = await this.api.post('/announcements/', announcementData);
+    return response.data;
+  }
+
+  async updateAnnouncement(announcementId: string, announcementData: any): Promise<any> {
+    const response = await this.api.put(`/announcements/${announcementId}/`, announcementData);
+    return response.data;
+  }
+
+  async getAttendanceRecordsByClass(className: string): Promise<any[]> {
+    const endpoint = className === 'all' ? '/admin/attendance-records/' : `/admin/attendance-records/?class=${className}`;
+    const response = await this.api.get(endpoint);
+    return response.data;
+  }
+
   async getAttendanceRecords(): Promise<AttendanceRecord[]> {
     const response: AxiosResponse<AttendanceRecord[]> = await this.api.get('/attendance/records/');
     return response.data;
@@ -339,10 +390,12 @@ class ApiService {
     location?: string,
     imageData?: string
   ): Promise<AttendanceRecord> {
+    // Ensure confidence score complies with backend validation (max 5 total digits)
+    const roundedConfidence = Math.round(Number(confidenceScore) * 1000) / 1000;
     const requestData = {
       session_id: sessionId,
       face_encoding: faceEncoding,
-      confidence_score: confidenceScore,
+      confidence_score: roundedConfidence,
       location,
       image_data: imageData,
     };
@@ -448,9 +501,11 @@ class ApiService {
 
   // Face Recognition Methods
   async faceLogin(faceEncoding: string, confidenceScore: number, imageData?: string): Promise<AuthResponse> {
+    // Ensure confidence score complies with backend validation (max 5 total digits)
+    const roundedConfidence = Math.round(Number(confidenceScore) * 1000) / 1000;
     const response: AxiosResponse<AuthResponse> = await this.api.post('/users/face-login/', {
       face_encoding: faceEncoding,
-      confidence_score: confidenceScore,
+      confidence_score: roundedConfidence,
       image_data: imageData,
     });
     
@@ -485,10 +540,12 @@ class ApiService {
     location?: string,
     imageData?: string
   ): Promise<AttendanceRecord> {
+    // Ensure confidence score complies with backend validation (max 5 total digits)
+    const roundedConfidence = Math.round(Number(confidenceScore) * 1000) / 1000;
     const response: AxiosResponse<{ message: string; attendance: AttendanceRecord }> = await this.api.post('/attendance/face-attendance/', {
       session_id: sessionId,
       face_encoding: faceEncoding,
-      confidence_score: confidenceScore,
+      confidence_score: roundedConfidence,
       location,
       image_data: imageData,
     });
@@ -527,6 +584,27 @@ class ApiService {
   async getPredefinedClasses(): Promise<{ classes: Array<{ value: string; label: string; level: number }> }> {
     const response = await this.api.get('/attendance/predefined-classes/');
     return response.data;
+  }
+
+  // HTTP method wrappers for direct access
+  async get(url: string, config?: any): Promise<AxiosResponse> {
+    return await this.api.get(url, config);
+  }
+
+  async post(url: string, data?: any, config?: any): Promise<AxiosResponse> {
+    return await this.api.post(url, data, config);
+  }
+
+  async put(url: string, data?: any, config?: any): Promise<AxiosResponse> {
+    return await this.api.put(url, data, config);
+  }
+
+  async delete(url: string, config?: any): Promise<AxiosResponse> {
+    return await this.api.delete(url, config);
+  }
+
+  async patch(url: string, data?: any, config?: any): Promise<AxiosResponse> {
+    return await this.api.patch(url, data, config);
   }
 }
 
