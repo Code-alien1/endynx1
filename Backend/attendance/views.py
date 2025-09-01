@@ -31,6 +31,70 @@ from .serializers import (
 from users.models import User
 
 
+class StudentAttendanceView(generics.ListAPIView):
+    """View for getting student attendance records"""
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = AttendanceSerializer
+    
+    def get_queryset(self):
+        student_id = self.kwargs.get('student_id')
+        if student_id:
+            return Attendance.objects.filter(student_id=student_id).order_by('-session__date')
+        return Attendance.objects.filter(student=self.request.user).order_by('-session__date')
+
+
+class StudentProgressView(APIView):
+    """View for getting student progress reports"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request, student_id=None):
+        try:
+            if student_id:
+                student = User.objects.get(id=student_id)
+                # Check permissions
+                if not RoleBasedDataFilter.can_access_user_data(request.user, student):
+                    return Response(
+                        {'error': 'Permission denied'}, 
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            else:
+                student = request.user
+            
+            # Get attendance statistics
+            total_sessions = AttendanceSession.objects.filter(
+                class_info__students=student
+            ).count()
+            
+            attended_sessions = Attendance.objects.filter(
+                student=student,
+                status='present'
+            ).count()
+            
+            attendance_rate = (attended_sessions / total_sessions * 100) if total_sessions > 0 else 0
+            
+            # Get recent attendance
+            recent_attendance = Attendance.objects.filter(
+                student=student
+            ).order_by('-session__date')[:10]
+            
+            progress_data = {
+                'student_id': str(student.id),
+                'student_name': student.full_name,
+                'total_sessions': total_sessions,
+                'attended_sessions': attended_sessions,
+                'attendance_rate': round(attendance_rate, 2),
+                'recent_attendance': AttendanceSerializer(recent_attendance, many=True).data
+            }
+            
+            return Response(progress_data)
+            
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Student not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+
 def is_session_within_marking_window(session):
     """
     Check if the session is within the marking window.

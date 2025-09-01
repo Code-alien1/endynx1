@@ -21,6 +21,10 @@ from .serializers import (
     UserProfileUpdateSerializer, FaceRecognitionSerializer, UserSessionSerializer
 )
 
+# Import attendance models for progress view
+from attendance.models import AttendanceSession, Attendance
+from attendance.serializers import AttendanceSerializer
+
 
 class UserRegistrationView(APIView):
     """View for user registration"""
@@ -147,6 +151,78 @@ class FaceRecognitionView(APIView):
             serializer.save()
             return Response({'message': 'Face recognition data updated successfully'})
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UserDetailView(generics.RetrieveAPIView):
+    """View for getting user details by ID"""
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = UserSerializer
+    queryset = User.objects.all()
+    
+    def get_object(self):
+        user_id = self.kwargs['pk']
+        try:
+            user = User.objects.get(id=user_id)
+            # Check if the requesting user can access this user's data
+            if not RoleBasedDataFilter.can_access_user_data(self.request.user, user):
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("You don't have permission to access this user's data")
+            return user
+        except User.DoesNotExist:
+            from rest_framework.exceptions import NotFound
+            raise NotFound("User not found")
+
+
+class StudentProgressView(APIView):
+    """View for getting student progress reports"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request, pk=None):
+        try:
+            if pk:
+                student = User.objects.get(id=pk)
+                # Check permissions
+                if not RoleBasedDataFilter.can_access_user_data(request.user, student):
+                    return Response(
+                        {'error': 'Permission denied'}, 
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+            else:
+                student = request.user
+            
+            # Get attendance statistics
+            total_sessions = AttendanceSession.objects.filter(
+                class_info__students=student
+            ).count()
+            
+            attended_sessions = Attendance.objects.filter(
+                student=student,
+                status='present'
+            ).count()
+            
+            attendance_rate = (attended_sessions / total_sessions * 100) if total_sessions > 0 else 0
+            
+            # Get recent attendance
+            recent_attendance = Attendance.objects.filter(
+                student=student
+            ).order_by('-session__date')[:10]
+            
+            progress_data = {
+                'student_id': str(student.id),
+                'student_name': student.full_name,
+                'total_sessions': total_sessions,
+                'attended_sessions': attended_sessions,
+                'attendance_rate': round(attendance_rate, 2),
+                'recent_attendance': AttendanceSerializer(recent_attendance, many=True).data
+            }
+            
+            return Response(progress_data)
+            
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Student not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 
 # Role-specific views

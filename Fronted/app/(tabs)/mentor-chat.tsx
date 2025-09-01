@@ -9,11 +9,11 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  SafeAreaView,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useAuth } from '../../contexts/AuthContext';
+import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
-import { apiService } from '../../services/api';
+import apiService from '../../services/api';
 
 interface Message {
   id: string;
@@ -22,129 +22,149 @@ interface Message {
   is_read: boolean;
   message_type: 'text' | 'image' | 'file';
   attachment?: string;
-  sender: {
-    id: number;
-    username: string;
-    first_name: string;
-    last_name: string;
-  };
+  sender_id: string;
+  sender_username: string;
 }
 
 interface ChatRoom {
   id: string;
-  student: {
-    id: number;
-    username: string;
-    first_name: string;
-    last_name: string;
-  };
-  mentor: {
-    id: number;
-    username: string;
-    first_name: string;
-    last_name: string;
-  };
+  student_name: string;
+  mentor_name: string;
+  student_email: string;
+  mentor_email: string;
   created_at: string;
   updated_at: string;
   is_active: boolean;
   last_message?: Message;
-  unread_count: number;
+  unread_count?: number;
 }
 
-export default function MentorChatScreen() {
-  const { user } = useAuth();
+export default function MentorChat() {
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
-  const [selectedChatRoom, setSelectedChatRoom] = useState<ChatRoom | null>(null);
+  const [selectedRoom, setSelectedRoom] = useState<ChatRoom | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
+    loadCurrentUser();
     loadChatRooms();
   }, []);
 
   useEffect(() => {
-    if (selectedChatRoom) {
-      loadMessages();
-      // Set up polling for new messages
-      const interval = setInterval(loadMessages, 3000);
+    if (selectedRoom) {
+      loadMessages(selectedRoom.id);
+      
+      // Set up polling for real-time updates with very fast interval
+      const interval = setInterval(() => {
+        loadMessages(selectedRoom.id);
+      }, 1000); // Very fast polling every 1 second
+
       return () => clearInterval(interval);
     }
-  }, [selectedChatRoom]);
+  }, [selectedRoom]);
+
+  const loadCurrentUser = async () => {
+    try {
+      const user = await apiService.getCurrentUser();
+      setCurrentUser(user);
+    } catch (error) {
+      console.error('Error loading current user:', error);
+    }
+  };
 
   const loadChatRooms = async () => {
     try {
-      setLoading(true);
-      const response = await apiService.get('/api/chat/chat-rooms/');
-      
-      if (response.data && response.data.results) {
-        setChatRooms(response.data.results);
-        if (response.data.results.length > 0 && !selectedChatRoom) {
-          setSelectedChatRoom(response.data.results[0]);
-        }
-      }
+      const response = await apiService.get('/chat/chat-rooms/');
+      const rooms = response.data.results || response.data;
+      setChatRooms(rooms);
+      setLoading(false);
     } catch (error) {
       console.error('Error loading chat rooms:', error);
-      Alert.alert('Error', 'Failed to load chats. Please try again.');
-    } finally {
       setLoading(false);
     }
   };
 
-  const loadMessages = async () => {
-    if (!selectedChatRoom) return;
-
+  const loadMessages = async (roomId: string) => {
+    if (isLoadingMessages) return; // Prevent duplicate requests
+    
     try {
-      const response = await apiService.get(`/api/chat/chat-rooms/${selectedChatRoom.id}/messages/`);
+      setIsLoadingMessages(true);
+      const response = await apiService.get(`/chat/messages/?chat_room=${roomId}`);
+      const messagesList = response.data.results || response.data;
+      // Reverse to show newest messages at bottom
+      setMessages(messagesList.reverse());
       
-      if (response.data) {
-        const messagesData = response.data.results || response.data;
-        setMessages(messagesData.reverse());
-        
-        // Mark messages as read
-        await markMessagesAsRead();
+      // Mark messages as read
+      const unreadMessages = messagesList.filter((msg: Message) => 
+        !msg.is_read && msg.sender_id !== currentUser?.id
+      );
+      
+      if (unreadMessages.length > 0) {
+        await Promise.all(
+          unreadMessages.map((msg: Message) =>
+            apiService.patch(`/chat/messages/${msg.id}/`, { is_read: true })
+          )
+        );
       }
     } catch (error) {
       console.error('Error loading messages:', error);
-    }
-  };
-
-  const markMessagesAsRead = async () => {
-    if (!selectedChatRoom) return;
-
-    try {
-      await apiService.post(`/api/chat/chat-rooms/${selectedChatRoom.id}/mark_messages_read/`);
-    } catch (error) {
-      console.error('Error marking messages as read:', error);
+    } finally {
+      setIsLoadingMessages(false);
     }
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedChatRoom || sending) return;
+    if (!newMessage.trim() || !selectedRoom) return;
 
-    setSending(true);
     try {
-      const response = await apiService.post(`/api/chat/chat-rooms/${selectedChatRoom.id}/send_message/`, {
+      const messageData = {
+        chat_room: selectedRoom.id,
         content: newMessage.trim(),
-        message_type: 'text'
-      });
+        message_type: 'text',
+      };
 
-      if (response.data) {
-        setMessages(prev => [...prev, response.data]);
-        setNewMessage('');
-        
-        setTimeout(() => {
-          flatListRef.current?.scrollToEnd({ animated: true });
-        }, 100);
-      }
+      console.log('Mentor sending message data:', messageData);
+      console.log('Selected room ID type:', typeof selectedRoom.id);
+      console.log('Current user:', currentUser);
+
+      const response = await apiService.post('/chat/messages/', messageData);
+      console.log('Mentor message sent successfully:', response);
+      
+      // Add the new message to the current messages list immediately at the bottom
+      const newMsg = response.data;
+      setMessages(prevMessages => [...prevMessages, newMsg]);
+      
+      setNewMessage('');
+      
+      // Auto-scroll to bottom after sending message
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+      
+      // Still load messages to sync with server, but don't wait for it
+      setTimeout(() => {
+        loadMessages(selectedRoom.id);
+        loadChatRooms(); // Update last message in room list
+      }, 1000);
     } catch (error) {
       console.error('Error sending message:', error);
-      Alert.alert('Error', 'Failed to send message. Please try again.');
-    } finally {
-      setSending(false);
+      console.error('Error details:', (error as any).response?.data);
+      Alert.alert('Error', 'Failed to send message');
     }
+  };
+
+  const selectRoom = (room: ChatRoom) => {
+    setSelectedRoom(room);
+    loadMessages(room.id);
+  };
+
+  const goBackToRooms = () => {
+    setSelectedRoom(null);
+    setMessages([]);
   };
 
   const formatTime = (timestamp: string) => {
@@ -167,67 +187,91 @@ export default function MentorChatScreen() {
     }
   };
 
-  const renderChatRoomItem = ({ item }: { item: ChatRoom }) => {
-    const studentName = `${item.student.first_name} ${item.student.last_name}`.trim() || item.student.username;
-    const isSelected = selectedChatRoom?.id === item.id;
-
-    return (
-      <TouchableOpacity
-        style={[styles.chatRoomItem, isSelected && styles.selectedChatRoom]}
-        onPress={() => setSelectedChatRoom(item)}
-      >
-        <View style={styles.studentAvatar}>
-          <MaterialCommunityIcons name="account" size={24} color={theme.colors.primary} />
+  const renderChatRoom = ({ item }: { item: ChatRoom }) => (
+    <TouchableOpacity
+      style={styles.chatRoomItem}
+      onPress={() => selectRoom(item)}
+    >
+      <View style={styles.avatarContainer}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>
+            {item.student_name.split(' ').map(n => n.charAt(0)).join('')}
+          </Text>
         </View>
-        <View style={styles.chatRoomInfo}>
-          <Text style={styles.studentName}>{studentName}</Text>
+        {item.unread_count && item.unread_count > 0 && (
+          <View style={styles.unreadBadge}>
+            <Text style={styles.unreadText}>{item.unread_count}</Text>
+          </View>
+        )}
+      </View>
+      
+      <View style={styles.chatInfo}>
+        <View style={styles.chatListHeader}>
+          <Text style={styles.studentName}>
+            {item.student_name}
+          </Text>
           {item.last_message && (
-            <Text style={styles.lastMessage} numberOfLines={1}>
-              {item.last_message.content}
+            <Text style={styles.lastMessageTime}>
+              {formatTime(item.last_message.timestamp)}
             </Text>
           )}
         </View>
-        {item.unread_count > 0 && (
-          <View style={styles.unreadBadge}>
-            <Text style={styles.unreadCount}>{item.unread_count}</Text>
-          </View>
-        )}
-      </TouchableOpacity>
-    );
-  };
+        
+        <View style={styles.lastMessageContainer}>
+          <Text style={styles.lastMessage} numberOfLines={1}>
+            {item.last_message?.content || 'No messages yet'}
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color="#ccc" />
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
 
   const renderMessage = ({ item, index }: { item: Message; index: number }) => {
-    const isMyMessage = item.sender.id === Number(user?.id);
+    const isMyMessage = item.sender_id === currentUser?.id;
     const showDate = index === 0 || 
       formatDate(item.timestamp) !== formatDate(messages[index - 1]?.timestamp);
 
     return (
       <View>
         {showDate && (
-          <View style={styles.dateSeparator}>
+          <View style={styles.dateContainer}>
             <Text style={styles.dateText}>{formatDate(item.timestamp)}</Text>
           </View>
         )}
+        
         <View style={[
           styles.messageContainer,
-          isMyMessage ? styles.myMessage : styles.theirMessage
+          isMyMessage ? styles.myMessageContainer : styles.otherMessageContainer
         ]}>
           <View style={[
             styles.messageBubble,
-            isMyMessage ? styles.myMessageBubble : styles.theirMessageBubble
+            isMyMessage ? styles.myMessage : styles.otherMessage
           ]}>
             <Text style={[
               styles.messageText,
-              isMyMessage ? styles.myMessageText : styles.theirMessageText
+              isMyMessage ? styles.myMessageText : styles.otherMessageText
             ]}>
               {item.content}
             </Text>
-            <Text style={[
-              styles.messageTime,
-              isMyMessage ? styles.myMessageTime : styles.theirMessageTime
-            ]}>
-              {formatTime(item.timestamp)}
-            </Text>
+            
+            <View style={styles.messageFooter}>
+              <Text style={[
+                styles.messageTime,
+                isMyMessage ? styles.myMessageTime : styles.otherMessageTime
+              ]}>
+                {formatTime(item.timestamp)}
+              </Text>
+              
+              {isMyMessage && (
+                <Ionicons
+                  name={item.is_read ? "checkmark-done" : "checkmark"}
+                  size={16}
+                  color={item.is_read ? "#4CAF50" : "#999"}
+                  style={styles.readStatus}
+                />
+              )}
+            </View>
           </View>
         </View>
       </View>
@@ -236,49 +280,47 @@ export default function MentorChatScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <MaterialCommunityIcons name="loading" size={40} color={theme.colors.primary} />
-        <Text style={styles.loadingText}>Loading chats...</Text>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Ionicons name="chatbubbles" size={40} color={theme.colors.primary} />
+          <Text style={styles.loadingText}>Loading chats...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
-  if (chatRooms.length === 0) {
+  if (selectedRoom) {
     return (
-      <View style={styles.noChatsContainer}>
-        <MaterialCommunityIcons name="chat-outline" size={80} color={theme.colors.muted} />
-        <Text style={styles.noChatsTitle}>No Student Chats</Text>
-        <Text style={styles.noChatsText}>
-          You don't have any students assigned yet. Contact your administrator to get students assigned.
-        </Text>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      {/* Chat Rooms List */}
-      <View style={styles.chatRoomsContainer}>
-        <Text style={styles.sectionTitle}>Your Students</Text>
-        <FlatList
-          data={chatRooms}
-          keyExtractor={(item) => item.id}
-          renderItem={renderChatRoomItem}
-          style={styles.chatRoomsList}
-        />
-      </View>
-
-      {/* Chat Messages */}
-      {selectedChatRoom && (
+      <SafeAreaView style={styles.container}>
         <KeyboardAvoidingView 
           style={styles.chatContainer}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
           {/* Chat Header */}
           <View style={styles.chatHeader}>
-            <Text style={styles.chatTitle}>
-              {`${selectedChatRoom.student.first_name} ${selectedChatRoom.student.last_name}`.trim() || selectedChatRoom.student.username}
-            </Text>
+            <TouchableOpacity onPress={goBackToRooms} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={24} color="#fff" />
+            </TouchableOpacity>
+            
+            <View style={styles.chatHeaderInfo}>
+              <View style={styles.headerAvatar}>
+                <Text style={styles.headerAvatarText}>
+                  {selectedRoom.student_name.split(' ').map(n => n.charAt(0)).join('')}
+                </Text>
+              </View>
+              
+              <View style={styles.headerText}>
+                <Text style={styles.headerName}>
+                  {selectedRoom.student_name}
+                </Text>
+                <Text style={styles.headerStatus}>Student</Text>
+              </View>
+            </View>
+            
+            <TouchableOpacity style={styles.moreButton}>
+              <Ionicons name="ellipsis-vertical" size={20} color="#fff" />
+            </TouchableOpacity>
           </View>
 
           {/* Messages */}
@@ -289,190 +331,288 @@ export default function MentorChatScreen() {
             renderItem={renderMessage}
             style={styles.messagesList}
             contentContainerStyle={styles.messagesContent}
-            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
+            onLayout={() => flatListRef.current?.scrollToEnd()}
           />
 
-          {/* Input */}
+          {/* Message Input */}
           <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.textInput}
-              placeholder="Type a message..."
-              placeholderTextColor={theme.colors.textSecondary}
-              value={newMessage}
-              onChangeText={setNewMessage}
-              multiline
-              maxLength={1000}
-            />
-            <TouchableOpacity
-              style={[styles.sendButton, (!newMessage.trim() || sending) && styles.sendButtonDisabled]}
-              onPress={sendMessage}
-              disabled={!newMessage.trim() || sending}
-            >
-              <MaterialCommunityIcons 
-                name={sending ? "loading" : "send"} 
-                size={24} 
-                color={(!newMessage.trim() || sending) ? theme.colors.muted : theme.colors.primary}
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={styles.textInput}
+                value={newMessage}
+                onChangeText={setNewMessage}
+                placeholder="Type a message..."
+                multiline
+                maxLength={1000}
               />
-            </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]}
+                onPress={sendMessage}
+                disabled={!newMessage.trim()}
+              >
+                <Ionicons 
+                  name="send" 
+                  size={20} 
+                  color={newMessage.trim() ? "#fff" : "#ccc"} 
+                />
+              </TouchableOpacity>
+            </View>
           </View>
         </KeyboardAvoidingView>
-      )}
-    </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Student Chats</Text>
+        <View style={styles.headerIcons}>
+          <TouchableOpacity style={styles.iconButton}>
+            <Ionicons name="search" size={24} color={theme.colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconButton}>
+            <Ionicons name="chatbubbles" size={24} color={theme.colors.primary} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <FlatList
+        data={chatRooms}
+        keyExtractor={(item) => item.id}
+        renderItem={renderChatRoom}
+        style={styles.roomsList}
+        contentContainerStyle={styles.roomsContent}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="chatbubbles-outline" size={60} color="#ccc" />
+            <Text style={styles.emptyText}>No student chats</Text>
+            <Text style={styles.emptySubtext}>Students will appear here when assigned</Text>
+          </View>
+        }
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    flexDirection: 'row',
-    backgroundColor: theme.colors.background,
+    backgroundColor: '#f5f5f5',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.background,
   },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: theme.colors.text,
+    color: '#666',
   },
-  noChatsContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: theme.colors.background,
-    padding: 40,
+    padding: 20,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
-  noChatsTitle: {
+  title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: theme.colors.text,
-    marginTop: 20,
-    marginBottom: 10,
+    color: '#333',
   },
-  noChatsText: {
-    fontSize: 16,
-    color: theme.colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 24,
+  headerIcons: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  chatRoomsContainer: {
-    width: '40%',
-    backgroundColor: theme.colors.card,
-    borderRightWidth: 1,
-    borderRightColor: theme.colors["card-border"],
+  iconButton: {
+    padding: 8,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: theme.colors.text,
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors["card-border"],
-  },
-  chatRoomsList: {
+  roomsList: {
     flex: 1,
+  },
+  roomsContent: {
+    paddingVertical: 8,
   },
   chatRoomItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
+    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: theme.colors["card-border"],
+    borderBottomColor: '#f0f0f0',
   },
-  selectedChatRoom: {
-    backgroundColor: theme.colors.primary + '20',
-  },
-  studentAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
+  avatarContainer: {
+    position: 'relative',
     marginRight: 12,
   },
-  chatRoomInfo: {
-    flex: 1,
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  studentName: {
-    fontSize: 16,
+  avatarText: {
+    color: 'white',
+    fontSize: 18,
     fontWeight: 'bold',
-    color: theme.colors.text,
-  },
-  lastMessage: {
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-    marginTop: 2,
   },
   unreadBadge: {
-    backgroundColor: theme.colors.primary,
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#ff4444',
     borderRadius: 10,
     minWidth: 20,
     height: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 6,
   },
-  unreadCount: {
+  unreadText: {
     color: 'white',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  chatInfo: {
+    flex: 1,
+  },
+  chatListHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  studentName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  lastMessageTime: {
+    fontSize: 12,
+    color: '#999',
+  },
+  lastMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  lastMessage: {
+    fontSize: 14,
+    color: '#666',
+    flex: 1,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 60,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 4,
   },
   chatContainer: {
     flex: 1,
   },
   chatHeader: {
-    backgroundColor: theme.colors.card,
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors["card-border"],
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
-  chatTitle: {
-    fontSize: 18,
+  backButton: {
+    marginRight: 12,
+  },
+  chatHeaderInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  headerAvatarText: {
+    color: 'white',
+    fontSize: 16,
     fontWeight: 'bold',
-    color: theme.colors.text,
+  },
+  headerText: {
+    flex: 1,
+  },
+  headerName: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  headerStatus: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 14,
+  },
+  moreButton: {
+    padding: 8,
   },
   messagesList: {
     flex: 1,
+    backgroundColor: '#f5f5f5',
   },
   messagesContent: {
-    padding: 16,
+    paddingVertical: 8,
   },
-  dateSeparator: {
+  dateContainer: {
     alignItems: 'center',
     marginVertical: 16,
   },
   dateText: {
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    color: '#666',
     fontSize: 12,
-    color: theme.colors.textSecondary,
-    backgroundColor: theme.colors.muted,
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
   },
   messageContainer: {
     marginVertical: 2,
+    marginHorizontal: 16,
   },
-  myMessage: {
+  myMessageContainer: {
     alignItems: 'flex-end',
   },
-  theirMessage: {
+  otherMessageContainer: {
     alignItems: 'flex-start',
   },
   messageBubble: {
     maxWidth: '80%',
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 18,
   },
-  myMessageBubble: {
+  myMessage: {
     backgroundColor: theme.colors.primary,
     borderBottomRightRadius: 4,
   },
-  theirMessageBubble: {
-    backgroundColor: theme.colors.card,
+  otherMessage: {
+    backgroundColor: 'white',
     borderBottomLeftRadius: 4,
   },
   messageText: {
@@ -482,52 +622,58 @@ const styles = StyleSheet.create({
   myMessageText: {
     color: 'white',
   },
-  theirMessageText: {
-    color: theme.colors.text,
+  otherMessageText: {
+    color: '#333',
+  },
+  messageFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    justifyContent: 'flex-end',
   },
   messageTime: {
     fontSize: 12,
-    marginTop: 4,
   },
   myMessageTime: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'right',
+    color: 'rgba(255,255,255,0.8)',
   },
-  theirMessageTime: {
-    color: theme.colors.textSecondary,
+  otherMessageTime: {
+    color: '#999',
+  },
+  readStatus: {
+    marginLeft: 4,
   },
   inputContainer: {
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  inputWrapper: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    padding: 16,
-    backgroundColor: theme.colors.card,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors["card-border"],
+    backgroundColor: '#f5f5f5',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   textInput: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: theme.colors["card-border"],
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
     fontSize: 16,
-    color: theme.colors.text,
-    backgroundColor: theme.colors.background,
     maxHeight: 100,
+    paddingVertical: 8,
   },
   sendButton: {
-    marginLeft: 12,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.primary,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.primary,
+    marginLeft: 8,
   },
   sendButtonDisabled: {
-    borderColor: theme.colors.muted,
+    backgroundColor: '#ccc',
   },
 });

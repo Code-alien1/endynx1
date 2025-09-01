@@ -13,6 +13,7 @@ import AppBackground from '../../components/AppBackground';
 import ExpoCameraFaceAuth from '../../components/ExpoCameraFaceAuth';
 import { COLORS, theme } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
+import type { User } from '../../services/api';
 import { getRoleDashboardTitle } from '../../utils/roleRedirect';
 import faceRecognitionService from '../../services/faceRecognitionService';
 import { router } from 'expo-router';
@@ -28,6 +29,9 @@ export default function DashboardScreen() {
   });
 
   if (!user) return null;
+
+  // Use the user directly since User type already includes all roles
+  const typedUser = user;
 
   useEffect(() => {
     loadDashboardData();
@@ -54,11 +58,11 @@ export default function DashboardScreen() {
   };
 
   const navigateToTab = (tabName: string) => {
-    router.push(`/(tabs)/${tabName}`);
+    router.push(`/(tabs)/${tabName}` as any);
   };
 
   // Show admin dashboard for administration users
-  if (user.role === 'administration') {
+  if (typedUser.role === 'administration') {
     return (
       <AppBackground>
         <ScrollView 
@@ -155,7 +159,7 @@ export default function DashboardScreen() {
   }
 
   // Original dashboard for other roles
-  const dashboardTitle = getRoleDashboardTitle(user.role);
+  const dashboardTitle = getRoleDashboardTitle(typedUser.role);
   const currentTime = new Date();
   const greeting = currentTime.getHours() < 12 ? 'Good Morning' : 
                   currentTime.getHours() < 18 ? 'Good Afternoon' : 'Good Evening';
@@ -167,7 +171,7 @@ export default function DashboardScreen() {
   }>({ registered: false, loading: true });
 
   useEffect(() => {
-    if (user.role === 'student') {
+    if (typedUser.role === 'student') {
       checkFaceRegistrationStatus();
     }
   }, [user]);
@@ -232,7 +236,7 @@ export default function DashboardScreen() {
           </View>
 
           {/* Role-specific quick info */}
-          {user.role === 'student' && (
+          {typedUser.role === 'student' && (
             <>
               <View style={styles.infoCard}>
                 <MaterialCommunityIcons name="school" size={20} color={COLORS.primary} />
@@ -285,7 +289,7 @@ export default function DashboardScreen() {
             </>
           )}
 
-          {user.role === 'teacher' && (
+          {typedUser.role === 'teacher' && (
             <View style={styles.infoCard}>
               <MaterialCommunityIcons name="clipboard-check" size={20} color={COLORS.primary} />
               <Text style={styles.infoText}>
@@ -294,7 +298,7 @@ export default function DashboardScreen() {
             </View>
           )}
 
-          {(user.role === 'administration' || user.role === 'superadmin') && (
+          {(typedUser.role === 'administration' || typedUser.role === 'superadmin') && (
             <View style={styles.infoCard}>
               <MaterialCommunityIcons name="cog" size={20} color={COLORS.primary} />
               <Text style={styles.infoText}>
@@ -303,7 +307,7 @@ export default function DashboardScreen() {
             </View>
           )}
 
-          {user.role === 'parent' && (
+          {typedUser.role === 'parent' && (
             <View style={styles.infoCard}>
               <MaterialCommunityIcons name="account-group" size={20} color={COLORS.primary} />
               <Text style={styles.infoText}>
@@ -312,7 +316,7 @@ export default function DashboardScreen() {
             </View>
           )}
 
-          {user.role === 'mentor' && (
+          {typedUser.role === 'mentor' && (
             <View style={styles.infoCard}>
               <MaterialCommunityIcons name="account-heart" size={20} color={COLORS.primary} />
               <Text style={styles.infoText}>

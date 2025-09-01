@@ -4,8 +4,8 @@ from rest_framework.response import Response
 from django.contrib.auth.models import User
 from django.db.models import Q, Prefetch
 from django.shortcuts import get_object_or_404
-from .models import ChatRoom, Message, MentorAssignment
-from .serializers import ChatRoomSerializer, MessageSerializer, MentorAssignmentSerializer
+from .models import ChatRoom, Message, MentorAssignment, MentorRating
+from .serializers import ChatRoomSerializer, MessageSerializer, MentorAssignmentSerializer, MentorRatingSerializer
 
 
 class ChatRoomViewSet(viewsets.ModelViewSet):
@@ -17,8 +17,6 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
         return ChatRoom.objects.filter(
             Q(student=user) | Q(mentor=user),
             is_active=True
-        ).prefetch_related(
-            Prefetch('messages', queryset=Message.objects.order_by('-timestamp')[:1])
         ).select_related('student', 'mentor')
 
     @action(detail=True, methods=['get'])
@@ -98,8 +96,20 @@ class ChatRoomViewSet(viewsets.ModelViewSet):
 
 
 class MessageViewSet(viewsets.ModelViewSet):
+    queryset = Message.objects.all()
     serializer_class = MessageSerializer
     permission_classes = [permissions.IsAuthenticated]
+    
+    def create(self, request, *args, **kwargs):
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.error(f"MessageViewSet.create called - User: {request.user.email}")
+        logger.error(f"Request data: {request.data}")
+        logger.error(f"Request method: {request.method}")
+        logger.error(f"Content type: {request.content_type}")
+        
+        return super().create(request, *args, **kwargs)
 
     def get_queryset(self):
         user = self.request.user
@@ -108,44 +118,68 @@ class MessageViewSet(viewsets.ModelViewSet):
         ).select_related('sender', 'chat_room')
 
     def perform_create(self, serializer):
-        # Get chat room from request data
-        chat_room_id = self.request.data.get('chat_room_id')
-        chat_room = get_object_or_404(ChatRoom, id=chat_room_id)
+        import logging
+        logger = logging.getLogger(__name__)
         
-        # Verify user has access to this chat room
+        logger.error(f"Message creation attempt - User: {self.request.user.email} ({self.request.user.role})")
+        logger.error(f"Request data: {self.request.data}")
+        
+        chat_room_id = self.request.data.get('chat_room')
+        logger.error(f"Chat room ID: {chat_room_id}, Type: {type(chat_room_id)}")
+        
+        try:
+            chat_room = get_object_or_404(ChatRoom, id=chat_room_id)
+            logger.error(f"Found chat room: {chat_room.id}, Student: {chat_room.student.email}, Mentor: {chat_room.mentor.email}")
+        except Exception as e:
+            logger.error(f"Error finding chat room: {e}")
+            raise
+            
         if self.request.user not in [chat_room.student, chat_room.mentor]:
-            return Response(
-                {'error': 'You do not have access to this chat room'}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        serializer.save(
-            chat_room=chat_room,
-            sender=self.request.user
-        )
+            logger.error(f"Access denied - User {self.request.user.email} not in chat room")
+            raise serializers.ValidationError('You do not have access to this chat room')
+            
+        try:
+            serializer.save(chat_room=chat_room, sender=self.request.user)
+            logger.error(f"Message saved successfully")
+        except Exception as e:
+            logger.error(f"Error saving message: {e}")
+            raise
 
 
 class MentorAssignmentViewSet(viewsets.ModelViewSet):
     serializer_class = MentorAssignmentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def create(self, request, *args, **kwargs):
+        print(f"DEBUG: Creating mentor assignment with data: {request.data}")
+        print(f"DEBUG: User: {request.user.email} (role: {request.user.role})")
+        
+        # Check if user has permission to create assignments
+        if request.user.role != 'administration' and not request.user.is_staff:
+            return Response(
+                {'error': 'Only administrators can create mentor assignments'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        return super().create(request, *args, **kwargs)
+
     def get_queryset(self):
         user = self.request.user
         
         # Admin users can see all assignments
-        if user.is_staff or hasattr(user, 'profile') and user.profile.role == 'administration':
+        if user.is_staff or user.role == 'administration':
             return MentorAssignment.objects.all().select_related(
                 'student', 'mentor', 'assigned_by'
             )
         
         # Mentors can see their assignments
-        elif hasattr(user, 'profile') and user.profile.role == 'mentor':
+        elif user.role == 'mentor':
             return MentorAssignment.objects.filter(
                 mentor=user, is_active=True
             ).select_related('student', 'mentor', 'assigned_by')
         
         # Students can see their assignment
-        elif hasattr(user, 'profile') and user.profile.role == 'student':
+        elif user.role == 'student':
             return MentorAssignment.objects.filter(
                 student=user, is_active=True
             ).select_related('student', 'mentor', 'assigned_by')
@@ -155,7 +189,7 @@ class MentorAssignmentViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def my_mentor(self, request):
         """Get the current user's mentor assignment (for students)"""
-        if not (hasattr(request.user, 'profile') and request.user.profile.role == 'student'):
+        if not request.user.role == 'student':
             return Response(
                 {'error': 'Only students can access this endpoint'}, 
                 status=status.HTTP_403_FORBIDDEN
@@ -177,7 +211,7 @@ class MentorAssignmentViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def my_students(self, request):
         """Get the current user's assigned students (for mentors)"""
-        if not (hasattr(request.user, 'profile') and request.user.profile.role == 'mentor'):
+        if not request.user.role == 'mentor':
             return Response(
                 {'error': 'Only mentors can access this endpoint'}, 
                 status=status.HTTP_403_FORBIDDEN
@@ -190,3 +224,35 @@ class MentorAssignmentViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(assignments, many=True)
         return Response(serializer.data)
+
+
+class MentorRatingViewSet(viewsets.ModelViewSet):
+    serializer_class = MentorRatingSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Admin users can see all ratings
+        if user.is_staff or user.role == 'administration':
+            return MentorRating.objects.all().select_related('mentor', 'student')
+        
+        # Mentors can see their own ratings
+        elif user.role == 'mentor':
+            return MentorRating.objects.filter(mentor=user).select_related('student')
+        
+        # Students can see their own given ratings
+        elif user.role == 'student':
+            return MentorRating.objects.filter(student=user).select_related('mentor')
+        
+        return MentorRating.objects.none()
+
+    def create(self, request, *args, **kwargs):
+        # Only students can create ratings
+        if request.user.role != 'student':
+            return Response(
+                {'error': 'Only students can rate mentors'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        return super().create(request, *args, **kwargs)

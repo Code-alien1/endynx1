@@ -15,6 +15,7 @@ import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import AppBackground from '../../components/AppBackground';
 import { COLORS } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
+import apiService from '../../services/api';
 
 interface Student {
   id: string;
@@ -31,6 +32,8 @@ interface Mentor {
   email: string;
   assigned_students: number;
   max_students: number;
+  rating?: number;
+  total_ratings?: number;
 }
 
 interface MentorAssignment {
@@ -54,102 +57,92 @@ export default function MentorsScreen() {
   const [selectedMentor, setSelectedMentor] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'students' | 'mentors' | 'assignments'>('students');
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (!dataLoaded) {
+      loadData();
+    }
+  }, [dataLoaded]);
 
   const loadData = async () => {
     try {
       setLoading(true);
       
-      // Mock data for demonstration
-      const mockStudents: Student[] = [
-        {
-          id: '1',
-          name: 'John Doe',
-          email: 'john.doe@student.edu',
-          class_name: 'BA1B',
-          mentor_id: '1',
-          mentor_name: 'Dr. Smith'
-        },
-        {
-          id: '2',
-          name: 'Jane Smith',
-          email: 'jane.smith@student.edu',
-          class_name: 'BA2A',
-          mentor_id: undefined,
-          mentor_name: undefined
-        },
-        {
-          id: '3',
-          name: 'Mike Johnson',
-          email: 'mike.johnson@student.edu',
-          class_name: 'CS1A',
-          mentor_id: '2',
-          mentor_name: 'Prof. Wilson'
-        },
-        {
-          id: '4',
-          name: 'Sarah Wilson',
-          email: 'sarah.wilson@student.edu',
-          class_name: 'BA1B',
-          mentor_id: undefined,
-          mentor_name: undefined
-        }
-      ];
+      // Load real data from API
+      const [studentsResponse, mentorsResponse, assignmentsResponse, ratingsResponse] = await Promise.all([
+        apiService.get('/users/?role=student'),
+        apiService.get('/users/?role=mentor'),
+        apiService.get('/chat/mentor-assignments/'),
+        apiService.get('/chat/mentor-ratings/')
+      ]);
 
-      const mockMentors: Mentor[] = [
-        {
-          id: '1',
-          name: 'Dr. Smith',
-          email: 'dr.smith@university.edu',
-          assigned_students: 1,
-          max_students: 5
-        },
-        {
-          id: '2',
-          name: 'Prof. Wilson',
-          email: 'prof.wilson@university.edu',
-          assigned_students: 1,
-          max_students: 3
-        },
-        {
-          id: '3',
-          name: 'Dr. Brown',
-          email: 'dr.brown@university.edu',
-          assigned_students: 0,
-          max_students: 4
-        }
-      ];
+      const studentsData = studentsResponse.data;
+      const mentorsData = mentorsResponse.data;
+      const assignmentsData = assignmentsResponse.data;
+      const ratingsData = ratingsResponse.data;
 
-      const mockAssignments: MentorAssignment[] = [
-        {
-          id: '1',
-          student_id: '1',
-          mentor_id: '1',
-          student_name: 'John Doe',
-          mentor_name: 'Dr. Smith',
-          assigned_date: '2024-01-15'
-        },
-        {
-          id: '2',
-          student_id: '3',
-          mentor_id: '2',
-          student_name: 'Mike Johnson',
-          mentor_name: 'Prof. Wilson',
-          assigned_date: '2024-01-20'
-        }
-      ];
+      // Transform API data to match interface
+      const transformedStudents: Student[] = (studentsData.results || studentsData).map((student: any) => ({
+        id: student.id,
+        name: `${student.first_name} ${student.last_name}`,
+        email: student.email,
+        class_name: student.class_name || 'N/A',
+        mentor_id: undefined,
+        mentor_name: undefined
+      }));
 
-      setStudents(mockStudents);
-      setMentors(mockMentors);
-      setAssignments(mockAssignments);
+      const transformedMentors: Mentor[] = (mentorsData.results || mentorsData).map((mentor: any) => {
+        const mentorRatings = ratingsData.filter((rating: any) => rating.mentor_id === mentor.id);
+        const avgRating = mentorRatings.length > 0 
+          ? mentorRatings.reduce((sum: number, r: any) => sum + r.rating, 0) / mentorRatings.length 
+          : 0;
+        
+        return {
+          id: mentor.id,
+          name: `${mentor.first_name} ${mentor.last_name}`,
+          email: mentor.email,
+          assigned_students: 0, // Will be calculated from assignments
+          max_students: 5, // Default capacity
+          rating: avgRating,
+          total_ratings: mentorRatings.length
+        };
+      });
+
+      const transformedAssignments: MentorAssignment[] = (assignmentsData.results || assignmentsData).map((assignment: any) => ({
+        id: assignment.id,
+        student_id: assignment.student_id,
+        mentor_id: assignment.mentor_id,
+        student_name: assignment.student_name,
+        mentor_name: assignment.mentor_name,
+        assigned_date: assignment.assigned_at?.split('T')[0] || new Date().toISOString().split('T')[0]
+      }));
+
+      // Update students with mentor info from assignments
+      const studentsWithMentors = transformedStudents.map(student => {
+        const assignment = transformedAssignments.find(a => a.student_id === student.id);
+        return assignment ? {
+          ...student,
+          mentor_id: assignment.mentor_id,
+          mentor_name: assignment.mentor_name
+        } : student;
+      });
+
+      // Update mentor assigned student counts
+      const mentorsWithCounts = transformedMentors.map(mentor => ({
+        ...mentor,
+        assigned_students: transformedAssignments.filter(a => a.mentor_id === mentor.id).length
+      }));
+
+      setStudents(studentsWithMentors);
+      setMentors(mentorsWithCounts);
+      setAssignments(transformedAssignments);
     } catch (error) {
       console.error('Error loading mentor data:', error);
       Alert.alert('Error', 'Failed to load mentor data');
     } finally {
       setLoading(false);
+      setDataLoaded(true);
     }
   };
 
@@ -172,34 +165,18 @@ export default function MentorsScreen() {
     }
 
     try {
-      // Mock API call
-      const mentor = mentors.find(m => m.id === selectedMentor);
-      if (!mentor) return;
-
-      // Update local state
-      setStudents(prev => prev.map(s => 
-        s.id === selectedStudent.id 
-          ? { ...s, mentor_id: selectedMentor, mentor_name: mentor.name }
-          : s
-      ));
-
-      setMentors(prev => prev.map(m => 
-        m.id === selectedMentor 
-          ? { ...m, assigned_students: m.assigned_students + 1 }
-          : m
-      ));
-
-      const newAssignment: MentorAssignment = {
-        id: Date.now().toString(),
+      // Create assignment via API
+      const assignmentData = {
         student_id: selectedStudent.id,
         mentor_id: selectedMentor,
-        student_name: selectedStudent.name,
-        mentor_name: mentor.name,
-        assigned_date: new Date().toISOString().split('T')[0]
+        notes: `Assigned via admin interface`
       };
 
-      setAssignments(prev => [...prev, newAssignment]);
-
+      await apiService.post('/chat/mentor-assignments/', assignmentData);
+      
+      // Refresh data to show updated assignments
+      await loadData();
+      
       setShowAssignModal(false);
       Alert.alert('Success', 'Mentor assigned successfully!');
     } catch (error) {
@@ -219,23 +196,14 @@ export default function MentorsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const student = students.find(s => s.id === studentId);
-              if (!student || !student.mentor_id) return;
+              const assignment = assignments.find(a => a.student_id === studentId);
+              if (!assignment) return;
 
-              // Update local state
-              setStudents(prev => prev.map(s => 
-                s.id === studentId 
-                  ? { ...s, mentor_id: undefined, mentor_name: undefined }
-                  : s
-              ));
-
-              setMentors(prev => prev.map(m => 
-                m.id === student.mentor_id 
-                  ? { ...m, assigned_students: Math.max(0, m.assigned_students - 1) }
-                  : m
-              ));
-
-              setAssignments(prev => prev.filter(a => a.student_id !== studentId));
+              // Remove assignment via API
+              await apiService.delete(`/chat/mentor-assignments/${assignment.id}/`);
+              
+              // Refresh data
+              await loadData();
 
               Alert.alert('Success', 'Assignment removed successfully!');
             } catch (error) {
@@ -325,6 +293,18 @@ export default function MentorsScreen() {
       <Text style={styles.cardInfo}>
         Capacity: {item.assigned_students} of {item.max_students} students
       </Text>
+      {item.rating && item.total_ratings ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+          <Ionicons name="star" size={16} color="#FFD700" />
+          <Text style={styles.cardInfo}>
+            {item.rating.toFixed(1)} ({item.total_ratings} ratings)
+          </Text>
+        </View>
+      ) : (
+        <Text style={[styles.cardInfo, { color: COLORS['muted-foreground'] }]}>
+          No ratings yet
+        </Text>
+      )}
     </View>
   );
 

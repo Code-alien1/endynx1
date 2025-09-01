@@ -86,12 +86,12 @@ class MentorAssignment(models.Model):
     student = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
         on_delete=models.CASCADE, 
-        related_name='assigned_students'
+        related_name='mentor_assignments_as_student'
     )
     mentor = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
         on_delete=models.CASCADE, 
-        related_name='assigned_mentors'
+        related_name='mentor_assignments_as_mentor'
     )
     assigned_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
@@ -122,3 +122,31 @@ class MentorAssignment(models.Model):
             if not created:
                 chat_room.is_active = True
                 chat_room.save()
+
+
+class MentorRating(models.Model):
+    """
+    Represents student ratings of mentors for admin review
+    """
+    mentor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='received_ratings'
+    )
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='given_ratings'
+    )
+    rating = models.IntegerField(choices=[(i, i) for i in range(1, 6)])  # 1-5 stars
+    comment = models.TextField(blank=True, null=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    reviewed_by_admin = models.BooleanField(default=False)
+    admin_notes = models.TextField(blank=True, null=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        unique_together = ('mentor', 'student')  # One rating per student-mentor pair
+
+    def __str__(self):
+        return f"{self.student.username} rated {self.mentor.username}: {self.rating}/5"

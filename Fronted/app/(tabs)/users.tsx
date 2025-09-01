@@ -21,7 +21,7 @@ interface User {
   email: string;
   first_name: string;
   last_name: string;
-  role: string;
+  role: 'student' | 'parent' | 'teacher' | 'mentor' | 'administration' | 'superadmin';
   student_class?: string;
 }
 

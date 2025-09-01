@@ -8,11 +8,14 @@ import {
   RefreshControl,
   FlatList,
   Alert,
+  Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import AppBackground from '../../components/AppBackground';
 import { COLORS } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
+import apiService from '../../services/api';
 
 interface Student {
   id: string;
@@ -23,106 +26,163 @@ interface Student {
   last_active: string;
   academic_status: 'excellent' | 'good' | 'needs_attention' | 'at_risk';
   notes?: string;
+  absences?: any[];
+  progress_reports?: any[];
+  assignment_id?: number;
+  assigned_by_name?: string;
+  assigned_at?: string;
+  assignment_notes?: string;
 }
 
-interface MentorSession {
+interface MentorRating {
   id: string;
-  student_id: string;
   student_name: string;
-  date: string;
-  type: 'academic' | 'personal' | 'career';
-  notes: string;
-  status: 'scheduled' | 'completed' | 'cancelled';
+  rating: number;
+  comment: string;
+  timestamp: string;
+  status: 'pending' | 'reviewed';
 }
 
 export default function MyStudentsScreen() {
   const { user } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
-  const [sessions, setSessions] = useState<MentorSession[]>([]);
+  const [ratings, setRatings] = useState<MentorRating[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'students' | 'sessions'>('students');
+  const [activeTab, setActiveTab] = useState<'students' | 'ratings'>('students');
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [showReportsModal, setShowReportsModal] = useState(false);
+  const [studentReports, setStudentReports] = useState<any>(null);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (!dataLoaded) {
+      loadData();
+    }
+  }, [dataLoaded]);
 
   const loadData = async () => {
     try {
       setLoading(true);
       
-      // Mock data for demonstration
-      const mockStudents: Student[] = [
-        {
-          id: '1',
-          name: 'John Doe',
-          email: 'john.doe@student.edu',
-          class_name: 'BA1B',
-          attendance_rate: 92,
-          last_active: '2024-01-29',
-          academic_status: 'excellent',
-          notes: 'Excellent performance in all subjects. Very motivated student.'
-        },
-        {
-          id: '2',
-          name: 'Sarah Wilson',
-          email: 'sarah.wilson@student.edu',
-          class_name: 'BA1B',
-          attendance_rate: 78,
-          last_active: '2024-01-28',
-          academic_status: 'needs_attention',
-          notes: 'Struggling with mathematics. Needs additional support.'
-        },
-        {
-          id: '3',
-          name: 'Mike Johnson',
-          email: 'mike.johnson@student.edu',
-          class_name: 'CS1A',
-          attendance_rate: 85,
-          last_active: '2024-01-29',
-          academic_status: 'good',
-          notes: 'Good progress overall. Shows interest in programming.'
+      // Load real assigned students from API
+      const assignmentsResponse = await apiService.get('/chat/mentor-assignments/');
+      const assignments = assignmentsResponse.data.results || assignmentsResponse.data;
+      
+      // Filter assignments for current mentor
+      const mentorAssignments = assignments.filter((a: any) => 
+        a.mentor_id === user?.id || a.mentor_email === user?.email
+      );
+      console.log('Mentor assignments found:', mentorAssignments.length);
+      
+      // Get student details for each assignment
+      const studentPromises = mentorAssignments.map(async (assignment: any) => {
+        try {
+          // Use student info from assignment if student_id is available
+          let student;
+          if (assignment.student_id) {
+            try {
+              const studentResponse = await apiService.get(`/users/${assignment.student_id}/`);
+              student = studentResponse.data;
+            } catch (studentError) {
+              console.log('Using assignment data for student:', assignment.student_name);
+              // Fallback to assignment data
+              student = {
+                id: assignment.student_id || 'unknown',
+                first_name: assignment.student_name?.split(' ')[0] || 'Unknown',
+                last_name: assignment.student_name?.split(' ')[1] || 'Student',
+                email: assignment.student_email,
+                class_name: 'N/A'
+              };
+            }
+          } else {
+            // Use assignment data directly
+            student = {
+              id: 'unknown',
+              first_name: assignment.student_name?.split(' ')[0] || 'Unknown',
+              last_name: assignment.student_name?.split(' ')[1] || 'Student', 
+              email: assignment.student_email,
+              class_name: 'N/A'
+            };
+          }
+          
+          // Get attendance data for the student
+          let attendanceRate = 0;
+          try {
+            const attendanceResponse = await apiService.get(`/attendance/?student_id=${student.id}`);
+            const attendanceData = attendanceResponse.data.results || attendanceResponse.data;
+            const totalDays = attendanceData.length;
+            const presentDays = attendanceData.filter((a: any) => a.status === 'present').length;
+            attendanceRate = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
+          } catch (attendanceError) {
+            console.log('No attendance data found for student');
+          }
+          
+          return {
+            id: student.id,
+            name: `${student.first_name} ${student.last_name}`,
+            email: student.email,
+            class_name: student.class_name || 'N/A',
+            attendance_rate: attendanceRate,
+            last_active: new Date().toISOString(),
+            academic_status: attendanceRate >= 90 ? 'excellent' : 
+                           attendanceRate >= 75 ? 'good' : 
+                           attendanceRate >= 60 ? 'needs_attention' : 'at_risk',
+            notes: assignment.notes || '',
+            assignment_id: assignment.id,
+            assigned_by_name: assignment.assigned_by_name || 'Administrator',
+            assigned_at: assignment.assigned_at,
+            assignment_notes: assignment.notes
+          } as Student;
+        } catch (error) {
+          console.error('Error loading student details:', error);
+          return null;
         }
-      ];
-
-      const mockSessions: MentorSession[] = [
-        {
-          id: '1',
-          student_id: '1',
-          student_name: 'John Doe',
-          date: '2024-02-01',
-          type: 'academic',
-          notes: 'Discussed career goals and academic planning',
-          status: 'scheduled'
-        },
-        {
-          id: '2',
-          student_id: '2',
-          student_name: 'Sarah Wilson',
-          date: '2024-01-28',
-          type: 'academic',
-          notes: 'Reviewed mathematics concepts and provided additional resources',
-          status: 'completed'
-        },
-        {
-          id: '3',
-          student_id: '3',
-          student_name: 'Mike Johnson',
-          date: '2024-02-02',
-          type: 'career',
-          notes: 'Career guidance session - exploring internship opportunities',
-          status: 'scheduled'
-        }
-      ];
-
-      setStudents(mockStudents);
-      setSessions(mockSessions);
+      });
+      
+      const studentsData = await Promise.all(studentPromises);
+      setStudents(studentsData.filter(s => s !== null));
+      
+      // Load mentor ratings
+      try {
+        const ratingsResponse = await apiService.get('/chat/mentor-ratings/');
+        const allRatings = ratingsResponse.data.results || ratingsResponse.data;
+        const mentorRatings = allRatings.filter((r: any) => r.mentor_id === user?.id);
+        setRatings(mentorRatings);
+      } catch (ratingsError) {
+        console.log('No ratings found');
+      }
+      
     } catch (error) {
-      console.error('Error loading student data:', error);
+      console.error('Error loading data:', error);
       Alert.alert('Error', 'Failed to load student data');
     } finally {
       setLoading(false);
+      setDataLoaded(true);
     }
+  };
+
+  const loadStudentReports = async (studentId: string) => {
+    try {
+      const [absencesResponse, progressResponse] = await Promise.all([
+        apiService.get(`/attendance/?student_id=${studentId}&status=absent`),
+        apiService.get(`/users/${studentId}/progress/`) // Assuming this endpoint exists
+      ]);
+      
+      setStudentReports({
+        absences: absencesResponse.data.results || absencesResponse.data,
+        progress: progressResponse.data || []
+      });
+    } catch (error) {
+      console.error('Error loading student reports:', error);
+      setStudentReports({ absences: [], progress: [] });
+    }
+  };
+
+  const handleStudentPress = (student: Student) => {
+    setSelectedStudent(student);
+    loadStudentReports(student.id);
+    setShowReportsModal(true);
   };
 
   const onRefresh = async () => {
@@ -183,7 +243,10 @@ export default function MyStudentsScreen() {
   };
 
   const renderStudentCard = ({ item }: { item: Student }) => (
-    <View style={styles.card}>
+    <TouchableOpacity 
+      style={styles.card}
+      onPress={() => handleStudentPress(item)}
+    >
       <View style={styles.cardHeader}>
         <View style={styles.studentInfo}>
           <View style={styles.studentTitleContainer}>
@@ -226,6 +289,31 @@ export default function MyStudentsScreen() {
         </View>
       )}
 
+      {/* Assignment Information */}
+      <View style={styles.assignmentContainer}>
+        <Text style={styles.assignmentTitle}>Assignment Details</Text>
+        <View style={styles.assignmentDetailItem}>
+          <MaterialCommunityIcons name="account-supervisor" size={16} color={COLORS['muted-foreground']} />
+          <Text style={styles.assignmentDetailText}>
+            Assigned by: {item.assigned_by_name || 'Administrator'}
+          </Text>
+        </View>
+        <View style={styles.assignmentDetailItem}>
+          <MaterialCommunityIcons name="calendar" size={16} color={COLORS['muted-foreground']} />
+          <Text style={styles.assignmentDetailText}>
+            Assigned on: {item.assigned_at ? new Date(item.assigned_at).toLocaleDateString() : 'N/A'}
+          </Text>
+        </View>
+        {item.assignment_notes && (
+          <View style={styles.assignmentDetailItem}>
+            <MaterialCommunityIcons name="text" size={16} color={COLORS['muted-foreground']} />
+            <Text style={styles.assignmentDetailText}>
+              Assignment notes: {item.assignment_notes}
+            </Text>
+          </View>
+        )}
+      </View>
+
       <View style={styles.cardActions}>
         <TouchableOpacity
           style={styles.actionButton}
@@ -242,26 +330,25 @@ export default function MyStudentsScreen() {
           <Text style={[styles.actionButtonText, { color: 'white' }]}>Schedule</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
-  const renderSessionCard = ({ item }: { item: MentorSession }) => (
+  const renderRatingCard = ({ item }: { item: MentorRating }) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <View style={styles.sessionInfo}>
-          <View style={styles.sessionTitleContainer}>
+        <View style={styles.ratingInfo}>
+          <View style={styles.ratingTitleContainer}>
             <MaterialCommunityIcons 
-              name={item.type === 'academic' ? 'school' : item.type === 'career' ? 'briefcase' : 'account-heart'} 
+              name="star" 
               size={20} 
               color={COLORS.primary} 
             />
-            <Text style={styles.sessionTitle}>{item.student_name}</Text>
+            <Text style={styles.ratingTitle}>{item.student_name}</Text>
           </View>
           <View style={[
             styles.statusBadge, 
             { 
-              backgroundColor: item.status === 'completed' ? COLORS.success : 
-                              item.status === 'scheduled' ? COLORS.primary : COLORS.destructive 
+              backgroundColor: item.status === 'reviewed' ? COLORS.success : COLORS.primary
             }
           ]}>
             <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
@@ -269,44 +356,28 @@ export default function MyStudentsScreen() {
         </View>
       </View>
 
-      <View style={styles.sessionDetails}>
-        <View style={styles.sessionDetailItem}>
-          <MaterialCommunityIcons name="calendar" size={16} color={COLORS['muted-foreground']} />
-          <Text style={styles.sessionDetailText}>
-            {new Date(item.date).toLocaleDateString()}
+      <View style={styles.ratingDetails}>
+        <View style={styles.ratingDetailItem}>
+          <MaterialCommunityIcons name="star-outline" size={16} color={COLORS['muted-foreground']} />
+          <Text style={styles.ratingDetailText}>
+            {item.rating}/5 stars
           </Text>
         </View>
-        <View style={styles.sessionDetailItem}>
-          <MaterialCommunityIcons name="tag" size={16} color={COLORS['muted-foreground']} />
-          <Text style={styles.sessionDetailText}>{item.type} session</Text>
+        <View style={styles.ratingDetailItem}>
+          <MaterialCommunityIcons name="calendar" size={16} color={COLORS['muted-foreground']} />
+          <Text style={styles.ratingDetailText}>
+            {new Date(item.timestamp).toLocaleDateString()}
+          </Text>
         </View>
       </View>
 
       <View style={styles.notesContainer}>
-        <MaterialCommunityIcons name="note-text" size={16} color={COLORS['muted-foreground']} />
-        <Text style={styles.notesText}>{item.notes}</Text>
+        <MaterialCommunityIcons name="comment-text" size={16} color={COLORS['muted-foreground']} />
+        <Text style={styles.notesText}>{item.comment}</Text>
       </View>
-
-      {item.status === 'scheduled' && (
-        <View style={styles.cardActions}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => Alert.alert('Reschedule', `Reschedule session with ${item.student_name}`)}
-          >
-            <MaterialCommunityIcons name="calendar-edit" size={16} color={COLORS.primary} />
-            <Text style={styles.actionButtonText}>Reschedule</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.primaryActionButton]}
-            onPress={() => Alert.alert('Complete', `Mark session with ${item.student_name} as completed`)}
-          >
-            <MaterialCommunityIcons name="check" size={16} color="white" />
-            <Text style={[styles.actionButtonText, { color: 'white' }]}>Complete</Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </View>
   );
+
 
   if (loading) {
     return (
@@ -338,13 +409,13 @@ export default function MyStudentsScreen() {
           </View>
           <View style={styles.statCard}>
             <MaterialCommunityIcons name="calendar-check" size={24} color={COLORS.success} />
-            <Text style={styles.statCardNumber}>{sessions.filter(s => s.status === 'completed').length}</Text>
-            <Text style={styles.statCardLabel}>Sessions Completed</Text>
+            <Text style={styles.statCardNumber}>{ratings.filter((r: MentorRating) => r.status === 'reviewed').length}</Text>
+            <Text style={styles.statCardLabel}>Ratings Reviewed</Text>
           </View>
           <View style={styles.statCard}>
             <MaterialCommunityIcons name="calendar-clock" size={24} color="#f59e0b" />
-            <Text style={styles.statCardNumber}>{sessions.filter(s => s.status === 'scheduled').length}</Text>
-            <Text style={styles.statCardLabel}>Upcoming Sessions</Text>
+            <Text style={styles.statCardNumber}>{ratings.filter((r: MentorRating) => r.status === 'pending').length}</Text>
+            <Text style={styles.statCardLabel}>Pending Ratings</Text>
           </View>
         </View>
 
@@ -359,11 +430,11 @@ export default function MyStudentsScreen() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'sessions' && styles.activeTab]}
-            onPress={() => setActiveTab('sessions')}
+            style={[styles.tab, activeTab === 'ratings' && styles.activeTab]}
+            onPress={() => setActiveTab('ratings')}
           >
-            <Text style={[styles.tabText, activeTab === 'sessions' && styles.activeTabText]}>
-              Sessions ({sessions.length})
+            <Text style={[styles.tabText, activeTab === 'ratings' && styles.activeTabText]}>
+              Ratings ({ratings.length})
             </Text>
           </TouchableOpacity>
         </View>
@@ -380,10 +451,10 @@ export default function MyStudentsScreen() {
             />
           )}
 
-          {activeTab === 'sessions' && (
+          {activeTab === 'ratings' && (
             <FlatList
-              data={sessions}
-              renderItem={renderSessionCard}
+              data={ratings}
+              renderItem={renderRatingCard}
               keyExtractor={(item) => item.id}
               scrollEnabled={false}
               showsVerticalScrollIndicator={false}
@@ -391,6 +462,117 @@ export default function MyStudentsScreen() {
           )}
         </View>
       </ScrollView>
+
+      {/* Student Reports Modal */}
+      <Modal
+        visible={showReportsModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowReportsModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>
+              {selectedStudent?.name} - Reports
+            </Text>
+            <TouchableOpacity
+              onPress={() => setShowReportsModal(false)}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close" size={24} color={COLORS.foreground} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalContent}>
+            {/* Absences Section */}
+            <View style={styles.reportSection}>
+              <Text style={styles.reportSectionTitle}>
+                Recent Absences ({studentReports?.absences?.length || 0})
+              </Text>
+              {studentReports?.absences?.length > 0 ? (
+                studentReports.absences.map((absence: any, index: number) => (
+                  <View key={index} style={styles.reportItem}>
+                    <View style={styles.reportItemHeader}>
+                      <MaterialCommunityIcons 
+                        name="calendar-remove" 
+                        size={16} 
+                        color={COLORS.destructive} 
+                      />
+                      <Text style={styles.reportItemDate}>
+                        {new Date(absence.date).toLocaleDateString()}
+                      </Text>
+                    </View>
+                    <Text style={styles.reportItemReason}>
+                      Reason: {absence.reason || 'Not specified'}
+                    </Text>
+                    {absence.notes && (
+                      <Text style={styles.reportItemNotes}>
+                        Notes: {absence.notes}
+                      </Text>
+                    )}
+                  </View>
+                ))
+              ) : (
+                <View style={styles.emptyState}>
+                  <MaterialCommunityIcons 
+                    name="calendar-check" 
+                    size={48} 
+                    color={COLORS.success} 
+                  />
+                  <Text style={styles.emptyStateText}>No recent absences</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Progress Reports Section */}
+            <View style={styles.reportSection}>
+              <Text style={styles.reportSectionTitle}>
+                Progress Reports ({studentReports?.progress?.length || 0})
+              </Text>
+              {studentReports?.progress?.length > 0 ? (
+                studentReports.progress.map((report: any, index: number) => (
+                  <View key={index} style={styles.reportItem}>
+                    <View style={styles.reportItemHeader}>
+                      <MaterialCommunityIcons 
+                        name="chart-line" 
+                        size={16} 
+                        color={COLORS.primary} 
+                      />
+                      <Text style={styles.reportItemDate}>
+                        {new Date(report.date).toLocaleDateString()}
+                      </Text>
+                      <View style={[
+                        styles.gradeBadge,
+                        { backgroundColor: report.grade >= 80 ? COLORS.success : 
+                                          report.grade >= 60 ? '#f59e0b' : COLORS.destructive }
+                      ]}>
+                        <Text style={styles.gradeText}>{report.grade}%</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.reportItemSubject}>
+                      Subject: {report.subject}
+                    </Text>
+                    {report.comments && (
+                      <Text style={styles.reportItemNotes}>
+                        Comments: {report.comments}
+                      </Text>
+                    )}
+                  </View>
+                ))
+              ) : (
+                <View style={styles.emptyState}>
+                  <MaterialCommunityIcons 
+                    name="chart-line-variant" 
+                    size={48} 
+                    color={COLORS['muted-foreground']} 
+                  />
+                  <Text style={styles.emptyStateText}>No progress reports available</Text>
+                </View>
+              )}
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
     </AppBackground>
   );
 }
@@ -589,34 +771,145 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: COLORS.foreground,
   },
-  sessionInfo: {
+  ratingInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  sessionTitleContainer: {
+  ratingTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  sessionTitle: {
+  ratingTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: COLORS.foreground,
     marginLeft: 8,
   },
-  sessionDetails: {
+  ratingDetails: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-  sessionDetailItem: {
+  ratingDetailItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  sessionDetailText: {
+  ratingDetailText: {
     fontSize: 14,
     color: COLORS['muted-foreground'],
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: COLORS.foreground,
+  },
+  closeButton: {
+    padding: 8,
+  },
+  modalContent: {
+    flex: 1,
+    padding: 20,
+  },
+  reportSection: {
+    marginBottom: 32,
+  },
+  reportSectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.foreground,
+    marginBottom: 16,
+  },
+  reportItem: {
+    backgroundColor: COLORS.card,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  reportItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
+  },
+  reportItemDate: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.foreground,
+    flex: 1,
+  },
+  reportItemReason: {
+    fontSize: 14,
+    color: COLORS['muted-foreground'],
+    marginBottom: 4,
+  },
+  reportItemSubject: {
+    fontSize: 14,
+    color: COLORS['muted-foreground'],
+    marginBottom: 4,
+  },
+  reportItemNotes: {
+    fontSize: 14,
+    color: COLORS.foreground,
+    fontStyle: 'italic',
+  },
+  gradeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  gradeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: 32,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: COLORS['muted-foreground'],
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  assignmentContainer: {
+    backgroundColor: COLORS.background,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  assignmentTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.foreground,
+    marginBottom: 8,
+  },
+  assignmentDetailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    gap: 8,
+  },
+  assignmentDetailText: {
+    fontSize: 13,
+    color: COLORS['muted-foreground'],
+    flex: 1,
   },
 });

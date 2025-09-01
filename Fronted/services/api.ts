@@ -8,8 +8,10 @@ const resolveApiBaseUrl = (): string => {
   const envUrl = (process as any)?.env?.EXPO_PUBLIC_API_URL as string | undefined;
   if (envUrl && typeof envUrl === 'string') {
     // Normalize: remove trailing slash
-    return "http://192.168.83.107:8000/api";
+    const normalized = envUrl.replace(/\/$/, '');
+    return normalized.endsWith('/api') ? normalized : `${normalized}/api`;
   }
+
   
   // For development, use your computer's IP address
   // This allows the mobile app to connect to your Django server
@@ -23,13 +25,22 @@ const resolveApiBaseUrl = (): string => {
   const hostUri = (Constants as any)?.expoConfig?.hostUri || (Constants as any)?.manifest?.debuggerHost;
   if (hostUri) {
     const host = String(hostUri).split(':')[0];
+    // Avoid invalid 0.0.0.0 and pick sensible defaults
+    if (host === '0.0.0.0') {
+      if (Platform.OS === 'web') return 'http://127.0.0.1:8000/api';
+      if (Platform.OS === 'android') return 'http://10.0.2.2:8000/api';
+      return developmentIPs[0];
+    }
     return `http://${host}:8000/api`;
   }
   
   // Platform-specific defaults
   if (Platform.OS === 'android') {
-    // Android emulator maps host loopback to 10.0.2.2
-    return 'http://10.0.2.2:8000/api';
+    // Si tu es sur émulateur Android → utilise 10.0.2.2
+    // Si c'est un vrai téléphone Android → utilise l'IP LAN
+    return Constants.executionEnvironment === 'storeClient'
+      ? 'http://192.168.2.33:8000/api' // Android physique via Expo Go
+      : 'http://10.0.2.2:8000/api';    // Émulateur Android
   } else if (Platform.OS === 'web') {
     // Web can use localhost
     return 'http://localhost:8000/api';
@@ -49,7 +60,7 @@ export interface User {
   username: string;
   first_name: string;
   last_name: string;
-  role: 'student' | 'parent' | 'teacher' | 'mentor' | 'administration' | 'superadmin';
+  role: 'student' | 'parent' | 'teacher' | 'mentor' | 'superadmin' | 'administration';
   phone_number?: string;
   student_id?: string;
   teacher_id?: string;

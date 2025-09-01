@@ -17,6 +17,10 @@ urlpatterns = [
     path('records/', views.AttendanceListView.as_view(), name='attendance-list'),
     path('records/<uuid:pk>/', views.AttendanceDetailView.as_view(), name='attendance-detail'),
     
+    # Student-specific endpoints
+    path('', views.StudentAttendanceView.as_view(), name='student-attendance'),
+    path('<uuid:student_id>/', views.StudentAttendanceView.as_view(), name='student-attendance-by-id'),
+    
     # Face Recognition Attendance
     path('face-recognition/', views.FaceRecognitionAttendanceView.as_view(), name='face-recognition-attendance'),
     

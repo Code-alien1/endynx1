@@ -23,7 +23,7 @@ export default function Tablayout() {
   const getTabsForRole = () => {
     switch (user.role) {
       case 'student':
-        // For students: Dashboard, Attendance, Justify Absences, My Mentor, Settings
+        // For students: Dashboard, Attendance, Justify Absences, My Mentor, Chat, Settings
         return [
           {
             name: 'dashboard',
@@ -36,6 +36,24 @@ export default function Tablayout() {
             title: 'Attendance',
             icon: 'person-circle-check',
             iconSet: 'FontAwesome6'
+          },
+          {
+            name: 'absences',
+            title: 'Justify Absences',
+            icon: 'calendar-remove',
+            iconSet: 'MaterialCommunityIcons'
+          },
+          {
+            name: 'mentor',
+            title: 'My Mentor',
+            icon: 'school',
+            iconSet: 'Ionicons'
+          },
+          {
+            name: 'chat',
+            title: 'Chat',
+            icon: 'chatbubbles',
+            iconSet: 'Ionicons'
           },
           {
             name: 'setting',
@@ -271,7 +289,7 @@ export default function Tablayout() {
           options={{
             href: user.role === 'student' ? undefined : null,
             title: 'Chat',
-            tabBarIcon: ({size, color}) => renderIcon('chat', 'MaterialCommunityIcons', size, color),
+            tabBarIcon: ({size, color}) => renderIcon('chatbubbles', 'Ionicons', size, color),
           }}
         />
 
@@ -336,7 +354,7 @@ export default function Tablayout() {
           options={{
             href: user.role === 'mentor' ? undefined : null,
             title: 'Student Chats',
-            tabBarIcon: ({size, color}) => renderIcon('chat-multiple', 'MaterialCommunityIcons', size, color),
+            tabBarIcon: ({size, color}) => renderIcon('chatbubbles', 'Ionicons', size, color),
           }}
         />
 

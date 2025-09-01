@@ -14,6 +14,10 @@ urlpatterns = [
     path('change-password/', views.PasswordChangeView.as_view(), name='change-password'),
     path('face-recognition/', views.FaceRecognitionView.as_view(), name='face-recognition'),
     
+    # General user detail endpoint
+    path('<uuid:pk>/', views.UserDetailView.as_view(), name='user-detail'),
+    path('<uuid:pk>/progress/', views.StudentProgressView.as_view(), name='user-progress'),
+    
     # Student endpoints
     path('students/', views.StudentListView.as_view(), name='student-list'),
     path('students/<uuid:pk>/', views.StudentDetailView.as_view(), name='student-detail'),
