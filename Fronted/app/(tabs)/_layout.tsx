@@ -1,4 +1,4 @@
-import { View, Text } from 'react-native'
+import { View, Text, Platform } from 'react-native'
 import React from 'react'
 import { Tabs } from 'expo-router'
 import { Ionicons, MaterialCommunityIcons, FontAwesome6 } from '@expo/vector-icons'
@@ -70,6 +70,18 @@ export default function Tablayout() {
             title: 'Dashboard',
             icon: 'view-dashboard',
             iconSet: 'MaterialCommunityIcons'
+          },
+          {
+            name: 'my-children',
+            title: 'My Children',
+            icon: 'people',
+            iconSet: 'Ionicons'
+          },
+          {
+            name: 'announcements',
+            title: 'Announcements',
+            icon: 'megaphone',
+            iconSet: 'Ionicons'
           },
           {
             name: 'setting',
@@ -221,14 +233,23 @@ export default function Tablayout() {
                 backgroundColor: COLORS.background,
                 borderTopWidth: 0,
                 elevation: 0,
-                height: 60,
-                paddingBottom: 8,
-                paddingTop: 8,
+                height: Platform.OS === 'web' ? 50 : 60,
+                paddingBottom: Platform.OS === 'web' ? 4 : 8,
+                paddingTop: Platform.OS === 'web' ? 4 : 8,
+                flexDirection: 'row',
             },
             tabBarLabelStyle: {
-                fontSize: 11,
-                fontWeight: '500'
-            }
+                fontSize: Platform.OS === 'web' ? 10 : 11,
+                fontWeight: '500',
+                marginLeft: Platform.OS === 'web' ? 8 : 0,
+                marginTop: Platform.OS === 'web' ? 0 : 4,
+            },
+            tabBarItemStyle: Platform.OS === 'web' ? {
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingHorizontal: 8,
+            } : {}
         }}
     >
         {/* Always hide index tab */}
@@ -315,7 +336,7 @@ export default function Tablayout() {
         <Tabs.Screen
           name="announcements"
           options={{
-            href: user.role === 'administration' ? undefined : null,
+            href: ['parent', 'administration'].includes(user.role) ? undefined : null,
             title: 'Announcements',
             tabBarIcon: ({size, color}) => renderIcon('megaphone', 'Ionicons', size, color),
           }}
@@ -336,6 +357,16 @@ export default function Tablayout() {
             href: user.role === 'administration' ? undefined : null,
             title: 'Mentors',
             tabBarIcon: ({size, color}) => renderIcon('people-circle', 'Ionicons', size, color),
+          }}
+        />
+
+        {/* Parent-specific tabs */}
+        <Tabs.Screen
+          name="my-children"
+          options={{
+            href: user.role === 'parent' ? undefined : null,
+            title: 'My Children',
+            tabBarIcon: ({size, color}) => renderIcon('people', 'Ionicons', size, color),
           }}
         />
 

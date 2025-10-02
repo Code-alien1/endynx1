@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-%9*+8i4lcc9$==%r=4kmyjpk!@*ya7to))kyxupzthdllq+y(s
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '192.168.2.33', '192.168.33.107', '192.168.83.107', '192.168.191.107']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '192.168.237.107', '192.168.2.33', '192.168.108.107', '192.168.33.107', '192.168.83.107', '192.168.191.107', '192.168.69.107', '172.20.10.3']
 
 
 # Application definition
@@ -42,7 +42,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
-    'channels',
+    # 'channels',  # Temporarily disabled - install with: pip install channels
     'users',
     'attendance',
     'announcements',
@@ -148,6 +148,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Custom User Model
 AUTH_USER_MODEL = 'users.User'
 
+# Biometric Authentication Settings
+BIOMETRIC_SALT = 'edynx_secure_biometric_salt_2024_change_in_production'
+
 # REST Framework Configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -192,6 +195,9 @@ SIMPLE_JWT = {
 }
 
 # CORS Settings
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_PREFLIGHT_MAX_AGE = 86400
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -201,17 +207,30 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8082",
     "exp://localhost:8081",
     "exp://localhost:8082",
-    # Mobile device connections
+    # Current mobile network IP (updated)
+    "exp://192.168.69.107:8081",
+    "exp://192.168.69.107:8082", 
+    "http://192.168.69.107:8081",
+    "http://192.168.69.107:8082",
+    # Previous mobile network IP
+    "exp://192.168.108.107:8081",
+    "exp://192.168.108.107:8082", 
+    "http://192.168.108.107:8081",
+    "http://192.168.108.107:8082",
+    # Previous mobile network IPs
+    "exp://192.168.237.107:8081",
+    "exp://192.168.237.107:8082",
+    "http://192.168.237.107:8081",
+    "http://192.168.237.107:8082",
+    # Previous mobile device connections
     "exp://192.168.2.33:8081",
     "exp://192.168.2.33:8082",
     "http://192.168.2.33:8081",
     "http://192.168.2.33:8082",
-    # Current network IP
     "exp://192.168.33.107:8081",
     "exp://192.168.33.107:8082",
     "http://192.168.33.107:8081",
     "http://192.168.33.107:8082",
-    # Mobile device IP
     "exp://192.168.83.107:8081",
     "exp://192.168.83.107:8082",
     "http://192.168.83.107:8081",
@@ -247,3 +266,50 @@ CRISPY_TEMPLATE_PACK = 'bootstrap4'
 # File Upload Settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+
+# Geolocation Settings
+SCHOOL_LOCATION = {
+    'latitude': 3.8134061130704993,  # Nkol Anga'a, Yaoundé, Cameroon
+    'longitude': 11.557817151231376,  # Route de Mfou
+    'radius_meters': 500,  # Students must be within 500 meters to mark attendance
+    'name': 'IAI School Campus - Nkol Anga\'a'  
+}
+
+# Face Recognition API Settings
+# AWS Rekognition
+AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', 'your-aws-access-key')
+AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', 'your-aws-secret-key')
+AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
+
+# Azure Face API
+AZURE_FACE_API_KEY = os.getenv('AZURE_FACE_API_KEY', 'your-azure-face-api-key')
+AZURE_FACE_ENDPOINT = os.getenv('AZURE_FACE_ENDPOINT', 'https://your-region.api.cognitive.microsoft.com/')
+
+# Google Cloud Vision
+GOOGLE_APPLICATION_CREDENTIALS = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'path/to/your/service-account-key.json')
+
+# Face Recognition Settings
+FACE_RECOGNITION_SETTINGS = {
+    'confidence_threshold': 75.0,  # Minimum confidence for face match
+    'use_multiple_apis': True,     # Use multiple APIs for better accuracy
+    'fallback_enabled': True,      # Enable fallback to local recognition
+    'max_face_size_mb': 5,         # Maximum image size in MB
+}
+
+# Location Validation Settings
+LOCATION_VALIDATION = {
+    'enabled': True,
+    'strict_mode': False,  # If True, attendance only allowed within radius
+    'warning_distance': 1000,  # Show warning if beyond this distance (meters)
+    'offline_mode_enabled': True,  # Allow attendance when location unavailable
+}
+
+# Biometric Authentication Settings
+BIOMETRIC_SALT = os.environ.get('BIOMETRIC_SALT', 'edynx_biometric_salt_change_in_production_2024')
+BIOMETRIC_SETTINGS = {
+    'enabled': True,
+    'fallback_to_camera': True,  # Allow fallback to camera if biometric fails
+    'require_device_security': True,  # Require device to have security enabled
+    'max_biometric_attempts': 3,  # Maximum biometric attempts before fallback
+    'biometric_timeout': 30,  # Timeout for biometric authentication in seconds
+}

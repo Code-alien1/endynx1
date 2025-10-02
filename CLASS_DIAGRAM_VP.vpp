@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Project version="14.2" id="edynx-mobile-app-class-diagram">
+  <ModelElement xsi:type="Project" id="PROJECT" name="Edynx Mobile App Class Diagram"/>
+  
+  <!-- User Management Package -->
+  <ModelElement xsi:type="Package" id="PKG_USER_MANAGEMENT" name="User Management">
+    
+    <!-- User Class -->
+    <ModelElement xsi:type="Class" id="CLS_USER" name="User">
+      <Attribute id="ATTR_USER_ID" name="id" type="UUID" visibility="public" isPrimaryKey="true"/>
+      <Attribute id="ATTR_USER_EMAIL" name="email" type="String" visibility="public" isUnique="true"/>
+      <Attribute id="ATTR_USER_USERNAME" name="username" type="String" visibility="public"/>
+      <Attribute id="ATTR_USER_FIRST_NAME" name="first_name" type="String" visibility="public"/>
+      <Attribute id="ATTR_USER_LAST_NAME" name="last_name" type="String" visibility="public"/>
+      <Attribute id="ATTR_USER_PHONE" name="phone_number" type="String" visibility="public"/>
+      <Attribute id="ATTR_USER_ROLE" name="role" type="String" visibility="public" constraint="[student, parent, teacher, mentor, administration, superadmin]"/>
+      <Attribute id="ATTR_USER_ACTIVE" name="is_active" type="Boolean" visibility="public"/>
+      <Attribute id="ATTR_USER_CREATED" name="created_at" type="DateTime" visibility="public"/>
+      <Attribute id="ATTR_USER_UPDATED" name="updated_at" type="DateTime" visibility="public"/>
+      <Attribute id="ATTR_USER_PROFILE_PIC" name="profile_picture" type="ImageField" visibility="public"/>
+      <Attribute id="ATTR_USER_DOB" name="date_of_birth" type="Date" visibility="public"/>
+      <Attribute id="ATTR_USER_ADDRESS" name="address" type="Text" visibility="public"/>
+      
+      <!-- Student Fields -->
+      <Attribute id="ATTR_USER_STUDENT_ID" name="student_id" type="String" visibility="public" isUnique="true"/>
+      <Attribute id="ATTR_USER_LEVEL" name="level" type="Integer" visibility="public" constraint="[1,2,3]"/>
+      <Attribute id="ATTR_USER_CLASS_NAME" name="class_name" type="String" visibility="public"/>
+      <Attribute id="ATTR_USER_PARENT" name="parent" type="FK(User)" visibility="public"/>
+      
+      <!-- Teacher Fields -->
+      <Attribute id="ATTR_USER_TEACHER_ID" name="teacher_id" type="String" visibility="public" isUnique="true"/>
+      <Attribute id="ATTR_USER_SUBJECT" name="subject_taught" type="String" visibility="public"/>
+      <Attribute id="ATTR_USER_DEPARTMENT" name="department" type="String" visibility="public"/>
+      
+      <!-- Mentor Fields -->
+      <Attribute id="ATTR_USER_MENTOR_ID" name="mentor_id" type="String" visibility="public" isUnique="true"/>
+      <Attribute id="ATTR_USER_RATING" name="rating" type="Decimal" visibility="public"/>
+      <Attribute id="ATTR_USER_TOTAL_RATINGS" name="total_ratings" type="Integer" visibility="public"/>
+      
+      <!-- Admin Fields -->
+      <Attribute id="ATTR_USER_ADMIN_ID" name="admin_id" type="String" visibility="public" isUnique="true"/>
+      <Attribute id="ATTR_USER_POSITION" name="position" type="String" visibility="public"/>
+      
+      <!-- Face Recognition Fields -->
+      <Attribute id="ATTR_USER_FACE_ENCODING" name="face_encoding" type="Text" visibility="public"/>
+      <Attribute id="ATTR_USER_FACE_IMAGE" name="face_image" type="ImageField" visibility="public"/>
+      
+      <!-- Methods -->
+      <Operation id="OP_USER_GET_FULL_NAME" name="get_full_name" returnType="String" visibility="public"/>
+      <Operation id="OP_USER_IS_STUDENT" name="is_student" returnType="Boolean" visibility="public"/>
+      <Operation id="OP_USER_IS_PARENT" name="is_parent" returnType="Boolean" visibility="public"/>
+      <Operation id="OP_USER_IS_TEACHER" name="is_teacher" returnType="Boolean" visibility="public"/>
+      <Operation id="OP_USER_IS_MENTOR" name="is_mentor" returnType="Boolean" visibility="public"/>
+      <Operation id="OP_USER_IS_ADMIN" name="is_administration" returnType="Boolean" visibility="public"/>
+      <Operation id="OP_USER_CAN_HAVE_MENTOR" name="can_have_mentor" returnType="Boolean" visibility="public"/>
+      <Operation id="OP_USER_GET_MENTOR_LEVELS" name="get_available_mentor_levels" returnType="List" visibility="public"/>
+    </ModelElement>
+    
+    <!-- UserProfile Class -->
+    <ModelElement xsi:type="Class" id="CLS_USER_PROFILE" name="UserProfile">
+      <Attribute id="ATTR_PROFILE_USER" name="user" type="OneToOne(User)" visibility="public"/>
+      <Attribute id="ATTR_PROFILE_BIO" name="bio" type="Text" visibility="public"/>
+      <Attribute id="ATTR_PROFILE_EMERGENCY_CONTACT" name="emergency_contact" type="String" visibility="public"/>
+      <Attribute id="ATTR_PROFILE_EMERGENCY_NAME" name="emergency_contact_name" type="String" visibility="public"/>
+      <Attribute id="ATTR_PROFILE_GPA" name="gpa" type="Decimal" visibility="public"/>
+      <Attribute id="ATTR_PROFILE_ACADEMIC_YEAR" name="academic_year" type="String" visibility="public"/>
+      <Attribute id="ATTR_PROFILE_EXPERIENCE" name="experience_years" type="Integer" visibility="public"/>
+      <Attribute id="ATTR_PROFILE_QUALIFICATIONS" name="qualifications" type="Text" visibility="public"/>
+      <Attribute id="ATTR_PROFILE_SPECIALIZATIONS" name="specializations" type="Text" visibility="public"/>
+      <Attribute id="ATTR_PROFILE_CREATED" name="created_at" type="DateTime" visibility="public"/>
+      <Attribute id="ATTR_PROFILE_UPDATED" name="updated_at" type="DateTime" visibility="public"/>
+    </ModelElement>
+    
+    <!-- UserSession Class -->
+    <ModelElement xsi:type="Class" id="CLS_USER_SESSION" name="UserSession">
+      <Attribute id="ATTR_SESSION_USER" name="user" type="FK(User)" visibility="public"/>
+      <Attribute id="ATTR_SESSION_KEY" name="session_key" type="String" visibility="public" isUnique="true"/>
+      <Attribute id="ATTR_SESSION_DEVICE" name="device_info" type="Text" visibility="public"/>
+      <Attribute id="ATTR_SESSION_IP" name="ip_address" type="GenericIPAddress" visibility="public"/>
+      <Attribute id="ATTR_SESSION_USER_AGENT" name="user_agent" type="Text" visibility="public"/>
+      <Attribute id="ATTR_SESSION_ACTIVE" name="is_active" type="Boolean" visibility="public"/>
+      <Attribute id="ATTR_SESSION_CREATED" name="created_at" type="DateTime" visibility="public"/>
+      <Attribute id="ATTR_SESSION_LAST_ACTIVITY" name="last_activity" type="DateTime" visibility="public"/>
+    </ModelElement>
+  </ModelElement>
+  
+  <!-- Attendance System Package -->
+  <ModelElement xsi:type="Package" id="PKG_ATTENDANCE" name="Attendance System">
+    
+    <!-- Class -->
+    <ModelElement xsi:type="Class" id="CLS_CLASS" name="Class">
+      <Attribute id="ATTR_CLASS_ID" name="id" type="UUID" visibility="public" isPrimaryKey="true"/>
+      <Attribute id="ATTR_CLASS_NAME" name="name" type="String" visibility="public"/>
+      <Attribute id="ATTR_CLASS_LEVEL" name="level" type="Integer" visibility="public" constraint="[1,2,3]"/>
+      <Attribute id="ATTR_CLASS_TEACHER" name="teacher" type="FK(User)" visibility="public"/>
+      <Attribute id="ATTR_CLASS_CREATED" name="created_at" type="DateTime" visibility="public"/>
+      <Attribute id="ATTR_CLASS_UPDATED" name="updated_at" type="DateTime" visibility="public"/>
+    </ModelElement>
+    
+    <!-- AttendanceSession -->
+    <ModelElement xsi:type="Class" id="CLS_ATTENDANCE_SESSION" name="AttendanceSession">
+      <Attribute id="ATTR_SESSION_ID" name="id" type="UUID" visibility="public" isPrimaryKey="true"/>
+      <Attribute id="ATTR_SESSION_CLASS" name="class_obj" type="FK(Class)" visibility="public"/>
+      <Attribute id="ATTR_SESSION_TYPE" name="session_type" type="String" visibility="public" constraint="[morning, afternoon, evening, custom]"/>
+      <Attribute id="ATTR_SESSION_DATE" name="date" type="Date" visibility="public"/>
+      <Attribute id="ATTR_SESSION_START" name="start_time" type="Time" visibility="public"/>
+      <Attribute id="ATTR_SESSION_END" name="end_time" type="Time" visibility="public"/>
+      <Attribute id="ATTR_SESSION_ACTIVE" name="is_active" type="Boolean" visibility="public"/>
+      <Attribute id="ATTR_SESSION_CREATED_BY" name="created_by" type="FK(User)" visibility="public"/>
+      <Attribute id="ATTR_SESSION_CREATED_AT" name="created_at" type="DateTime" visibility="public"/>
+      <Attribute id="ATTR_SESSION_UPDATED_AT" name="updated_at" type="DateTime" visibility="public"/>
+    </ModelElement>
+    
+    <!-- Attendance -->
+    <ModelElement xsi:type="Class" id="CLS_ATTENDANCE" name="Attendance">
+      <Attribute id="ATTR_ATT_ID" name="id" type="UUID" visibility="public" isPrimaryKey="true"/>
+      <Attribute id="ATTR_ATT_STUDENT" name="student" type="FK(User)" visibility="public"/>
+      <Attribute id="ATTR_ATT_SESSION" name="session" type="FK(AttendanceSession)" visibility="public"/>
+      <Attribute id="ATTR_ATT_STATUS" name="status" type="String" visibility="public" constraint="[present, absent, late, excused, pending]"/>
+      <Attribute id="ATTR_ATT_METHOD" name="method" type="String" visibility="public" constraint="[face_recognition, qr_code, peer_scan, manual, justification, location_verified, face_and_location]"/>
+      <Attribute id="ATTR_ATT_TIMESTAMP" name="timestamp" type="DateTime" visibility="public"/>
+      <Attribute id="ATTR_ATT_LOCATION" name="location" type="String" visibility="public"/>
+      <Attribute id="ATTR_ATT_LOCATION_DATA" name="location_data" type="JSONField" visibility="public"/>
+      <Attribute id="ATTR_ATT_CONFIDENCE" name="confidence_score" type="Decimal" visibility="public"/>
+      <Attribute id="ATTR_ATT_VERIFIED_BY" name="verified_by" type="FK(User)" visibility="public"/>
+      <Attribute id="ATTR_ATT_VERIFIED_AT" name="verified_at" type="DateTime" visibility="public"/>
+      <Attribute id="ATTR_ATT_NOTES" name="notes" type="Text" visibility="public"/>
+    </ModelElement>
+    
+    <!-- AbsenceJustification -->
+    <ModelElement xsi:type="Class" id="CLS_ABSENCE_JUSTIFICATION" name="AbsenceJustification">
+      <Attribute id="ATTR_JUST_ID" name="id" type="UUID" visibility="public" isPrimaryKey="true"/>
+      <Attribute id="ATTR_JUST_STUDENT" name="student" type="FK(User)" visibility="public"/>
+      <Attribute id="ATTR_JUST_ATTENDANCE" name="attendance" type="OneToOne(Attendance)" visibility="public"/>
+      <Attribute id="ATTR_JUST_REASON" name="reason" type="Text" visibility="public"/>
+      <Attribute id="ATTR_JUST_PHOTO" name="photo" type="ImageField" visibility="public"/>
+      <Attribute id="ATTR_JUST_STATUS" name="status" type="String" visibility="public" constraint="[pending, approved, rejected]"/>
+      <Attribute id="ATTR_JUST_REVIEWED_BY" name="reviewed_by" type="FK(User)" visibility="public"/>
+      <Attribute id="ATTR_JUST_REVIEWED_AT" name="reviewed_at" type="DateTime" visibility="public"/>
+      <Attribute id="ATTR_JUST_REVIEW_NOTES" name="review_notes" type="Text" visibility="public"/>
+      <Attribute id="ATTR_JUST_SUBMITTED" name="submitted_at" type="DateTime" visibility="public"/>
+    </ModelElement>
+  </ModelElement>
+  
+  <!-- Face Recognition System Package -->
+  <ModelElement xsi:type="Package" id="PKG_FACE_RECOGNITION" name="Face Recognition System">
+    
+    <!-- FaceRegistration -->
+    <ModelElement xsi:type="Class" id="CLS_FACE_REGISTRATION" name="FaceRegistration">
+      <Attribute id="ATTR_FACE_REG_ID" name="id" type="UUID" visibility="public" isPrimaryKey="true"/>
+      <Attribute id="ATTR_FACE_REG_USER" name="user" type="OneToOne(User)" visibility="public"/>
+      <Attribute id="ATTR_FACE_REG_AUTH_METHOD" name="auth_method" type="String" visibility="public" constraint="[camera, biometric]"/>
+      <Attribute id="ATTR_FACE_REG_DEVICE_TYPE" name="device_type" type="String" visibility="public" constraint="[mobile, web, desktop]"/>
+      <Attribute id="ATTR_FACE_REG_ENCODING" name="face_encoding" type="Text" visibility="public"/>
+      <Attribute id="ATTR_FACE_REG_BIOMETRIC_ID" name="biometric_id" type="String" visibility="public"/>
+      <Attribute id="ATTR_FACE_REG_CONFIDENCE" name="confidence_score" type="Float" visibility="public"/>
+      <Attribute id="ATTR_FACE_REG_CREATED" name="created_at" type="DateTime" visibility="public"/>
+      <Attribute id="ATTR_FACE_REG_UPDATED" name="updated_at" type="DateTime" visibility="public"/>
+      <Attribute id="ATTR_FACE_REG_LAST_AUTH" name="last_authenticated" type="DateTime" visibility="public"/>
+      <Attribute id="ATTR_FACE_REG_IP" name="registration_ip" type="GenericIPAddress" visibility="public"/>
+      <Attribute id="ATTR_FACE_REG_USER_AGENT" name="user_agent" type="Text" visibility="public"/>
+      
+      <Operation id="OP_FACE_REG_GET_ENCODING" name="get_face_encoding_array" returnType="Array" visibility="public"/>
+      <Operation id="OP_FACE_REG_SET_ENCODING" name="set_face_encoding_array" returnType="void" visibility="public"/>
+      <Operation id="OP_FACE_REG_IS_BIOMETRIC" name="is_biometric_registration" returnType="Boolean" visibility="public"/>
+      <Operation id="OP_FACE_REG_IS_CAMERA" name="is_camera_registration" returnType="Boolean" visibility="public"/>
+    </ModelElement>
+    
+    <!-- FaceRecognitionAttempt -->
+    <ModelElement xsi:type="Class" id="CLS_FACE_ATTEMPT" name="FaceRecognitionAttempt">
+      <Attribute id="ATTR_ATTEMPT_ID" name="id" type="UUID" visibility="public" isPrimaryKey="true"/>
+      <Attribute id="ATTR_ATTEMPT_USER" name="user" type="FK(User)" visibility="public"/>
+      <Attribute id="ATTR_ATTEMPT_TYPE" name="attempt_type" type="String" visibility="public" constraint="[authentication, registration, update]"/>
+      <Attribute id="ATTR_ATTEMPT_RESULT" name="result" type="String" visibility="public" constraint="[success, failed, no_face, multiple_faces, low_quality, no_match, error]"/>
+      <Attribute id="ATTR_ATTEMPT_CONFIDENCE" name="confidence_score" type="Float" visibility="public"/>
+      <Attribute id="ATTR_ATTEMPT_IP" name="ip_address" type="GenericIPAddress" visibility="public"/>
+      <Attribute id="ATTR_ATTEMPT_USER_AGENT" name="user_agent" type="Text" visibility="public"/>
+      <Attribute id="ATTR_ATTEMPT_DEVICE" name="device_info" type="Text" visibility="public"/>
+      <Attribute id="ATTR_ATTEMPT_PROCESSING_TIME" name="processing_time" type="Float" visibility="public"/>
+      <Attribute id="ATTR_ATTEMPT_TIMESTAMP" name="timestamp" type="DateTime" visibility="public"/>
+      <Attribute id="ATTR_ATTEMPT_ERROR" name="error_message" type="Text" visibility="public"/>
+    </ModelElement>
+  </ModelElement>
+  
+  <!-- Chat System Package -->
+  <ModelElement xsi:type="Package" id="PKG_CHAT" name="Chat System">
+    
+    <!-- ChatRoom -->
+    <ModelElement xsi:type="Class" id="CLS_CHAT_ROOM" name="ChatRoom">
+      <Attribute id="ATTR_CHAT_STUDENT" name="student" type="FK(User)" visibility="public"/>
+      <Attribute id="ATTR_CHAT_MENTOR" name="mentor" type="FK(User)" visibility="public"/>
+      <Attribute id="ATTR_CHAT_CREATED" name="created_at" type="DateTime" visibility="public"/>
+      <Attribute id="ATTR_CHAT_UPDATED" name="updated_at" type="DateTime" visibility="public"/>
+      <Attribute id="ATTR_CHAT_ACTIVE" name="is_active" type="Boolean" visibility="public"/>
+      
+      <Operation id="OP_CHAT_LAST_MESSAGE" name="last_message" returnType="Message" visibility="public"/>
+    </ModelElement>
+    
+    <!-- Message -->
+    <ModelElement xsi:type="Class" id="CLS_MESSAGE" name="Message">
+      <Attribute id="ATTR_MSG_CHAT_ROOM" name="chat_room" type="FK(ChatRoom)" visibility="public"/>
+      <Attribute id="ATTR_MSG_SENDER" name="sender" type="FK(User)" visibility="public"/>
+      <Attribute id="ATTR_MSG_CONTENT" name="content" type="Text" visibility="public"/>
+      <Attribute id="ATTR_MSG_TIMESTAMP" name="timestamp" type="DateTime" visibility="public"/>
+      <Attribute id="ATTR_MSG_READ" name="is_read" type="Boolean" visibility="public"/>
+      <Attribute id="ATTR_MSG_TYPE" name="message_type" type="String" visibility="public" constraint="[text, image, file]"/>
+      <Attribute id="ATTR_MSG_ATTACHMENT" name="attachment" type="FileField" visibility="public"/>
+      
+      <Operation id="OP_MSG_MARK_READ" name="mark_as_read" returnType="void" visibility="public"/>
+    </ModelElement>
+    
+    <!-- MentorAssignment -->
+    <ModelElement xsi:type="Class" id="CLS_MENTOR_ASSIGNMENT" name="MentorAssignment">
+      <Attribute id="ATTR_ASSIGN_STUDENT" name="student" type="FK(User)" visibility="public"/>
+      <Attribute id="ATTR_ASSIGN_MENTOR" name="mentor" type="FK(User)" visibility="public"/>
+      <Attribute id="ATTR_ASSIGN_BY" name="assigned_by" type="FK(User)" visibility="public"/>
+      <Attribute id="ATTR_ASSIGN_AT" name="assigned_at" type="DateTime" visibility="public"/>
+      <Attribute id="ATTR_ASSIGN_ACTIVE" name="is_active" type="Boolean" visibility="public"/>
+      <Attribute id="ATTR_ASSIGN_NOTES" name="notes" type="Text" visibility="public"/>
+    </ModelElement>
+  </ModelElement>
+  
+  <!-- Relationships -->
+  <ModelElement xsi:type="Association" id="ASSOC_USER_PROFILE" name="has">
+    <AssociationEnd id="END_USER_PROFILE_1" participant="CLS_USER" multiplicity="1"/>
+    <AssociationEnd id="END_USER_PROFILE_2" participant="CLS_USER_PROFILE" multiplicity="0..1"/>
+  </ModelElement>
+  
+  <ModelElement xsi:type="Association" id="ASSOC_USER_SESSION" name="has">
+    <AssociationEnd id="END_USER_SESSION_1" participant="CLS_USER" multiplicity="1"/>
+    <AssociationEnd id="END_USER_SESSION_2" participant="CLS_USER_SESSION" multiplicity="0..*"/>
+  </ModelElement>
+  
+  <ModelElement xsi:type="Association" id="ASSOC_USER_FACE_REG" name="has">
+    <AssociationEnd id="END_USER_FACE_1" participant="CLS_USER" multiplicity="1"/>
+    <AssociationEnd id="END_USER_FACE_2" participant="CLS_FACE_REGISTRATION" multiplicity="0..1"/>
+  </ModelElement>
+  
+  <ModelElement xsi:type="Association" id="ASSOC_CLASS_SESSION" name="contains">
+    <AssociationEnd id="END_CLASS_SESSION_1" participant="CLS_CLASS" multiplicity="1"/>
+    <AssociationEnd id="END_CLASS_SESSION_2" participant="CLS_ATTENDANCE_SESSION" multiplicity="0..*"/>
+  </ModelElement>
+  
+  <ModelElement xsi:type="Association" id="ASSOC_SESSION_ATTENDANCE" name="has">
+    <AssociationEnd id="END_SESSION_ATT_1" participant="CLS_ATTENDANCE_SESSION" multiplicity="1"/>
+    <AssociationEnd id="END_SESSION_ATT_2" participant="CLS_ATTENDANCE" multiplicity="0..*"/>
+  </ModelElement>
+  
+  <ModelElement xsi:type="Association" id="ASSOC_ATTENDANCE_JUSTIFICATION" name="justified_by">
+    <AssociationEnd id="END_ATT_JUST_1" participant="CLS_ATTENDANCE" multiplicity="1"/>
+    <AssociationEnd id="END_ATT_JUST_2" participant="CLS_ABSENCE_JUSTIFICATION" multiplicity="0..1"/>
+  </ModelElement>
+  
+  <ModelElement xsi:type="Association" id="ASSOC_CHAT_MESSAGE" name="contains">
+    <AssociationEnd id="END_CHAT_MSG_1" participant="CLS_CHAT_ROOM" multiplicity="1"/>
+    <AssociationEnd id="END_CHAT_MSG_2" participant="CLS_MESSAGE" multiplicity="0..*"/>
+  </ModelElement>
+  
+  <ModelElement xsi:type="Association" id="ASSOC_USER_PARENT_CHILD" name="parent_of">
+    <AssociationEnd id="END_PARENT" participant="CLS_USER" multiplicity="0..1"/>
+    <AssociationEnd id="END_CHILD" participant="CLS_USER" multiplicity="0..*"/>
+  </ModelElement>
+  
+</Project>

@@ -82,7 +82,7 @@ export default function MyStudentsScreen() {
           let student;
           if (assignment.student_id) {
             try {
-              const studentResponse = await apiService.get(`/users/${assignment.student_id}/`);
+              const studentResponse = await apiService.get(`/edynx-admin/users/${assignment.student_id}/`);
               student = studentResponse.data;
             } catch (studentError) {
               console.log('Using assignment data for student:', assignment.student_name);
@@ -166,7 +166,7 @@ export default function MyStudentsScreen() {
     try {
       const [absencesResponse, progressResponse] = await Promise.all([
         apiService.get(`/attendance/?student_id=${studentId}&status=absent`),
-        apiService.get(`/users/${studentId}/progress/`) // Assuming this endpoint exists
+        apiService.get(`/edynx-admin/users/${studentId}/progress/`) // Assuming this endpoint exists
       ]);
       
       setStudentReports({

@@ -14,6 +14,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { StyleSheet } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../constants/theme';
+import apiService from '../../services/api';
 
 interface Justification {
   id: string;
@@ -21,21 +22,33 @@ interface Justification {
     first_name: string;
     last_name: string;
     id: string;
+    username: string;
   };
-  session: {
-    subject: string;
-    date: string;
+  attendance: {
+    id: string;
+    session: {
+      class_name: string;
+      date: string;
+      session_type: string;
+    };
   };
   reason: string;
   status: 'pending' | 'approved' | 'rejected';
-  photo_uri?: string;
+  photo?: string;
   submitted_at: string;
-  admin_comment?: string;
+  reviewed_at?: string;
+  reviewed_by?: {
+    first_name: string;
+    last_name: string;
+  };
+  review_notes?: string;
 }
 
 export default function JustificationsTab() {
   const { user } = useAuth();
   const [justifications, setJustifications] = useState<Justification[]>([]);
+  const [filteredJustifications, setFilteredJustifications] = useState<Justification[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [showActionModal, setShowActionModal] = useState(false);
   const [selectedJustification, setSelectedJustification] = useState<Justification | null>(null);
@@ -48,47 +61,82 @@ export default function JustificationsTab() {
 
   const loadJustifications = async () => {
     try {
-      // Enhanced mock data with photos and timestamps
-      setJustifications([
-        {
-          id: '1',
-          student: { first_name: 'John', last_name: 'Doe', id: 'student1' },
-          session: { subject: 'Mathematics', date: '2024-01-15' },
-          reason: 'Medical appointment - had to visit doctor for urgent checkup',
-          status: 'pending',
-          photo_uri: 'mock-medical-certificate',
-          submitted_at: '2024-01-15T10:30:00Z',
+      console.log('Loading justifications from API...');
+      
+      // Try multiple endpoints for justifications
+      let response;
+      try {
+        response = await apiService.get('/edynx-admin/justifications/');
+        console.log('API Response from /edynx-admin/justifications/:', response);
+      } catch (adminError) {
+        console.log('Admin justifications endpoint failed, trying attendance justifications:', adminError);
+        response = await apiService.get('/attendance/justifications/');
+        console.log('API Response from /attendance/justifications/:', response);
+      }
+      
+      const justificationsData = response.data?.results || response.data || response;
+      console.log('Justifications data:', justificationsData);
+      
+      if (!Array.isArray(justificationsData)) {
+        console.error('Justifications data is not an array:', justificationsData);
+        Alert.alert('Error', 'Invalid response format from server');
+        setJustifications([]);
+        return;
+      }
+      
+      // Transform API data to match our interface
+      const transformedJustifications: Justification[] = justificationsData.map((item: any) => ({
+        id: item.id?.toString() || Math.random().toString(),
+        student: {
+          first_name: item.student?.first_name || 'Unknown',
+          last_name: item.student?.last_name || 'Student',
+          id: item.student?.id || item.student_id || '',
+          username: item.student?.username || item.student?.email?.split('@')[0] || 'unknown',
         },
-        {
-          id: '2',
-          student: { first_name: 'Jane', last_name: 'Smith', id: 'student2' },
-          session: { subject: 'English', date: '2024-01-14' },
-          reason: 'Family emergency - had to attend to sick relative',
-          status: 'approved',
-          submitted_at: '2024-01-14T08:15:00Z',
-          admin_comment: 'Valid family emergency. Approved.',
+        attendance: {
+          id: item.attendance?.id || item.attendance_id || '',
+          session: {
+            class_name: item.attendance?.session?.class_name || item.session?.class_name || 'Unknown Class',
+            date: item.attendance?.session?.date || item.session?.date || new Date().toISOString().split('T')[0],
+            session_type: item.attendance?.session?.session_type || item.session?.session_type || 'morning',
+          },
         },
-        {
-          id: '3',
-          student: { first_name: 'Mike', last_name: 'Johnson', id: 'student3' },
-          session: { subject: 'Physics', date: '2024-01-16' },
-          reason: 'Transportation issues due to bad weather',
-          status: 'rejected',
-          submitted_at: '2024-01-16T09:00:00Z',
-          admin_comment: 'Weather was clear that day. Please provide valid documentation.',
-        },
-        {
-          id: '4',
-          student: { first_name: 'Sarah', last_name: 'Wilson', id: 'student4' },
-          session: { subject: 'Chemistry', date: '2024-01-17' },
-          reason: 'Dental appointment that could not be rescheduled',
-          status: 'pending',
-          photo_uri: 'mock-dental-appointment',
-          submitted_at: '2024-01-17T11:45:00Z',
-        },
-      ]);
-    } catch (error) {
+        reason: item.reason || 'No reason provided',
+        status: item.status || 'pending',
+        photo: item.photo,
+        submitted_at: item.submitted_at || new Date().toISOString(),
+        reviewed_at: item.reviewed_at,
+        reviewed_by: item.reviewed_by ? {
+          first_name: item.reviewed_by.first_name || 'Admin',
+          last_name: item.reviewed_by.last_name || 'User',
+        } : undefined,
+        review_notes: item.review_notes,
+      }));
+      
+      console.log('Transformed justifications:', transformedJustifications);
+      setJustifications(transformedJustifications);
+      setFilteredJustifications(transformedJustifications);
+      
+      if (transformedJustifications.length > 0) {
+        console.log(`Loaded ${transformedJustifications.length} justifications from database`);
+      }
+      
+    } catch (error: any) {
       console.error('Error loading justifications:', error);
+      
+      let errorMessage = 'Failed to load justifications from server.';
+      if (error.response) {
+        errorMessage += ` Status: ${error.response.status}`;
+        if (error.response.data) {
+          errorMessage += ` - ${JSON.stringify(error.response.data)}`;
+        }
+      } else if (error.message) {
+        errorMessage += ` Error: ${error.message}`;
+      }
+      
+      Alert.alert('Error', errorMessage);
+      setJustifications([]);
+      setFilteredJustifications([]);
     }
   };
 
@@ -103,21 +151,79 @@ export default function JustificationsTab() {
     if (!selectedJustification) return;
 
     try {
-      // Update justification status
+      const status = actionType === 'approve' ? 'approved' : 'rejected';
+      
+      // Try multiple endpoints for updating justification status
+      try {
+        await apiService.patch(`/edynx-admin/justifications/${selectedJustification.id}/`, {
+          status: status,
+          review_notes: adminComment,
+        });
+      } catch (adminError) {
+        console.log('Admin justifications update failed, trying attendance endpoint:', adminError);
+        await apiService.patch(`/attendance/justifications/${selectedJustification.id}/`, {
+          status: status,
+          review_notes: adminComment,
+        });
+      }
+
+      // Update local state
       const updatedJustifications = justifications.map(j => 
         j.id === selectedJustification.id 
-          ? { ...j, status: actionType === 'approve' ? 'approved' as const : 'rejected' as const, admin_comment: adminComment }
+          ? { 
+              ...j, 
+              status: status as 'approved' | 'rejected',
+              review_notes: adminComment,
+              reviewed_at: new Date().toISOString(),
+              reviewed_by: {
+                first_name: user?.first_name || 'Admin',
+                last_name: user?.last_name || 'User',
+              }
+            }
           : j
       );
       setJustifications(updatedJustifications);
+      filterJustifications(updatedJustifications, searchQuery);
 
       Alert.alert('Success', `Justification ${actionType}d successfully`);
       setShowActionModal(false);
       setSelectedJustification(null);
       setAdminComment('');
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error updating justification:', error);
       Alert.alert('Error', 'Failed to update justification');
     }
+  };
+
+  const filterJustifications = (justificationsList: Justification[], query: string) => {
+    if (!query.trim()) {
+      setFilteredJustifications(justificationsList);
+      return;
+    }
+
+    const filtered = justificationsList.filter(justification => {
+      const studentName = `${justification.student.first_name} ${justification.student.last_name}`.toLowerCase();
+      const username = justification.student.username.toLowerCase();
+      const className = justification.attendance.session.class_name.toLowerCase();
+      const reason = justification.reason.toLowerCase();
+      const status = justification.status.toLowerCase();
+      const searchTerm = query.toLowerCase();
+
+      return (
+        studentName.includes(searchTerm) ||
+        username.includes(searchTerm) ||
+        className.includes(searchTerm) ||
+        reason.includes(searchTerm) ||
+        status.includes(searchTerm)
+      );
+    });
+
+    setFilteredJustifications(filtered);
+  };
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    filterJustifications(justifications, query);
   };
 
   const onRefresh = async () => {
@@ -139,8 +245,35 @@ export default function JustificationsTab() {
     <View style={styles.container}>
       <Text style={styles.pageTitle}>Absence Justifications</Text>
       
+      {/* Search Filter */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchInputContainer}>
+          <MaterialCommunityIcons name="magnify" size={20} color={theme.colors.textSecondary} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by student name, class, reason, or status..."
+            placeholderTextColor={theme.colors.textSecondary}
+            value={searchQuery}
+            onChangeText={handleSearchChange}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              style={styles.clearSearchButton}
+              onPress={() => handleSearchChange('')}
+            >
+              <MaterialCommunityIcons name="close" size={20} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+        {searchQuery.length > 0 && (
+          <Text style={styles.searchResultsText}>
+            {filteredJustifications.length} of {justifications.length} justifications
+          </Text>
+        )}
+      </View>
+      
       <FlatList
-        data={justifications}
+        data={filteredJustifications}
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         renderItem={({ item }) => (
@@ -154,7 +287,7 @@ export default function JustificationsTab() {
               </View>
             </View>
             <Text style={styles.sessionInfo}>
-              {item.session.subject} - {new Date(item.session.date).toLocaleDateString()}
+              {item.attendance.session.class_name} - {new Date(item.attendance.session.date).toLocaleDateString()}
             </Text>
             <Text style={styles.justificationReason}>{item.reason}</Text>
             
@@ -162,7 +295,7 @@ export default function JustificationsTab() {
               <Text style={styles.submittedDate}>
                 Submitted: {new Date(item.submitted_at).toLocaleDateString()} at {new Date(item.submitted_at).toLocaleTimeString()}
               </Text>
-              {item.photo_uri && (
+              {item.photo && (
                 <View style={styles.photoIndicator}>
                   <MaterialCommunityIcons name="camera" size={16} color={theme.colors.primary} />
                   <Text style={styles.photoText}>Photo attached</Text>
@@ -170,10 +303,10 @@ export default function JustificationsTab() {
               )}
             </View>
 
-            {item.admin_comment && (
+            {item.review_notes && (
               <View style={styles.adminCommentSection}>
                 <Text style={styles.adminCommentLabel}>Admin Response:</Text>
-                <Text style={styles.adminCommentText}>{item.admin_comment}</Text>
+                <Text style={styles.adminCommentText}>{item.review_notes}</Text>
               </View>
             )}
 
@@ -198,7 +331,24 @@ export default function JustificationsTab() {
           </View>
         )}
         ListEmptyComponent={() => (
-          <Text style={styles.emptyText}>No justifications found</Text>
+          <View style={styles.emptyContainer}>
+            <MaterialCommunityIcons 
+              name={searchQuery ? "magnify" : "clipboard-text-outline"} 
+              size={64} 
+              color={theme.colors.textSecondary} 
+            />
+            <Text style={styles.emptyText}>
+              {searchQuery ? `No justifications found for "${searchQuery}"` : 'No justifications found'}
+            </Text>
+            {searchQuery && (
+              <TouchableOpacity 
+                style={styles.clearSearchButton}
+                onPress={() => handleSearchChange('')}
+              >
+                <Text style={styles.clearSearchText}>Clear search</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         )}
       />
 
@@ -232,13 +382,13 @@ export default function JustificationsTab() {
                 
                 <Text style={styles.previewLabel}>Session:</Text>
                 <Text style={styles.previewText}>
-                  {selectedJustification.session.subject} - {new Date(selectedJustification.session.date).toLocaleDateString()}
+                  {selectedJustification.attendance.session.class_name} - {new Date(selectedJustification.attendance.session.date).toLocaleDateString()}
                 </Text>
                 
                 <Text style={styles.previewLabel}>Reason:</Text>
                 <Text style={styles.previewText}>{selectedJustification.reason}</Text>
                 
-                {selectedJustification.photo_uri && (
+                {selectedJustification.photo && (
                   <View style={styles.photoIndicator}>
                     <MaterialCommunityIcons name="camera" size={16} color={theme.colors.primary} />
                     <Text style={styles.photoText}>Photo attached</Text>
@@ -293,6 +443,50 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: theme.colors.text,
     marginBottom: 16,
+  },
+  // Search styles
+  searchContainer: {
+    marginBottom: 16,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.card,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: theme.colors.text,
+    paddingVertical: 8,
+  },
+  clearSearchButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  searchResultsText: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  clearSearchText: {
+    fontSize: 16,
+    color: theme.colors.primary,
+    fontWeight: '500',
+    marginTop: 12,
   },
   justificationCard: {
     backgroundColor: theme.colors.card,
@@ -353,7 +547,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#6B7280',
     fontSize: 16,
-    marginTop: 32,
+    marginTop: 16,
   },
   // New styles for enhanced justifications
   justificationMeta: {

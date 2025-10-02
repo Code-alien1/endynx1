@@ -66,6 +66,8 @@ class Attendance(models.Model):
         ('peer_scan', 'Peer Scan'),
         ('manual', 'Manual Entry'),
         ('justification', 'Absence Justification'),
+        ('location_verified', 'Location Verified'),
+        ('face_and_location', 'Face Recognition + Location'),
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -75,6 +77,8 @@ class Attendance(models.Model):
     method = models.CharField(max_length=20, choices=ATTENDANCE_METHOD)
     timestamp = models.DateTimeField(auto_now_add=True)
     location = models.CharField(max_length=255, blank=True, null=True)  # GPS coordinates or location name
+    location_data = models.JSONField(blank=True, null=True)  # Structured location data (lat, lng, accuracy, address)
+    confidence_score = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)  # Face recognition confidence
     verified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='verified_attendance')
     verified_at = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True, null=True)
@@ -113,7 +117,7 @@ class AbsenceJustification(models.Model):
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='absence_justifications')
-    attendance = models.OneToOneField(Attendance, on_delete=models.CASCADE, related_name='justification')
+    attendance = models.OneToOneField(Attendance, on_delete=models.CASCADE, related_name='justification', null=True, blank=True)
     reason = models.TextField()
     photo = models.ImageField(upload_to='absence_justifications/', blank=True, null=True)
     status = models.CharField(max_length=20, choices=JUSTIFICATION_STATUS, default='pending')

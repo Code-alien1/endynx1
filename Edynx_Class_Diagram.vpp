@@ -1,0 +1,357 @@
+#Visual Paradigm: DO NOT MODIFY THIS FILE!
+#Thu Sep 24 17:38:27 GMT+01:00 2025
+modelVersion=14.2
+
+# Project Information
+project.name=Edynx Mobile App Class Diagram
+project.version=1.0
+project.author=Edynx Development Team
+project.description=Complete class diagram for Edynx mobile application including user management, attendance system, face recognition, and chat functionality
+
+# User Management Package
+package.UserManagement.name=User Management
+package.UserManagement.description=Core user management system supporting multiple roles
+
+# User Class
+class.User.package=UserManagement
+class.User.name=User
+class.User.stereotype=entity
+class.User.description=Central user model supporting 6 roles with role-specific fields
+
+# User Attributes
+class.User.attribute.id.name=id
+class.User.attribute.id.type=UUID
+class.User.attribute.id.visibility=public
+class.User.attribute.id.primaryKey=true
+
+class.User.attribute.email.name=email
+class.User.attribute.email.type=String
+class.User.attribute.email.visibility=public
+class.User.attribute.email.unique=true
+
+class.User.attribute.username.name=username
+class.User.attribute.username.type=String
+class.User.attribute.username.visibility=public
+
+class.User.attribute.first_name.name=first_name
+class.User.attribute.first_name.type=String
+class.User.attribute.first_name.visibility=public
+
+class.User.attribute.last_name.name=last_name
+class.User.attribute.last_name.type=String
+class.User.attribute.last_name.visibility=public
+
+class.User.attribute.phone_number.name=phone_number
+class.User.attribute.phone_number.type=String
+class.User.attribute.phone_number.visibility=public
+
+class.User.attribute.role.name=role
+class.User.attribute.role.type=String
+class.User.attribute.role.visibility=public
+class.User.attribute.role.constraint=student,parent,teacher,mentor,administration,superadmin
+
+class.User.attribute.is_active.name=is_active
+class.User.attribute.is_active.type=Boolean
+class.User.attribute.is_active.visibility=public
+
+class.User.attribute.created_at.name=created_at
+class.User.attribute.created_at.type=DateTime
+class.User.attribute.created_at.visibility=public
+
+class.User.attribute.updated_at.name=updated_at
+class.User.attribute.updated_at.type=DateTime
+class.User.attribute.updated_at.visibility=public
+
+class.User.attribute.student_id.name=student_id
+class.User.attribute.student_id.type=String
+class.User.attribute.student_id.visibility=public
+class.User.attribute.student_id.unique=true
+
+class.User.attribute.level.name=level
+class.User.attribute.level.type=Integer
+class.User.attribute.level.visibility=public
+class.User.attribute.level.constraint=1,2,3
+
+class.User.attribute.face_encoding.name=face_encoding
+class.User.attribute.face_encoding.type=Text
+class.User.attribute.face_encoding.visibility=public
+
+# User Methods
+class.User.operation.get_full_name.name=get_full_name
+class.User.operation.get_full_name.returnType=String
+class.User.operation.get_full_name.visibility=public
+
+class.User.operation.is_student.name=is_student
+class.User.operation.is_student.returnType=Boolean
+class.User.operation.is_student.visibility=public
+
+class.User.operation.is_teacher.name=is_teacher
+class.User.operation.is_teacher.returnType=Boolean
+class.User.operation.is_teacher.visibility=public
+
+# UserProfile Class
+class.UserProfile.package=UserManagement
+class.UserProfile.name=UserProfile
+class.UserProfile.stereotype=entity
+
+class.UserProfile.attribute.user.name=user
+class.UserProfile.attribute.user.type=User
+class.UserProfile.attribute.user.visibility=public
+class.UserProfile.attribute.user.relationship=OneToOne
+
+class.UserProfile.attribute.bio.name=bio
+class.UserProfile.attribute.bio.type=Text
+class.UserProfile.attribute.bio.visibility=public
+
+# Attendance System Package
+package.AttendanceSystem.name=Attendance System
+package.AttendanceSystem.description=Complete attendance tracking system with multiple authentication methods
+
+# Class Entity
+class.Class.package=AttendanceSystem
+class.Class.name=Class
+class.Class.stereotype=entity
+
+class.Class.attribute.id.name=id
+class.Class.attribute.id.type=UUID
+class.Class.attribute.id.visibility=public
+class.Class.attribute.id.primaryKey=true
+
+class.Class.attribute.name.name=name
+class.Class.attribute.name.type=String
+class.Class.attribute.name.visibility=public
+
+class.Class.attribute.level.name=level
+class.Class.attribute.level.type=Integer
+class.Class.attribute.level.visibility=public
+
+class.Class.attribute.teacher.name=teacher
+class.Class.attribute.teacher.type=User
+class.Class.attribute.teacher.visibility=public
+class.Class.attribute.teacher.relationship=ForeignKey
+
+# AttendanceSession Class
+class.AttendanceSession.package=AttendanceSystem
+class.AttendanceSession.name=AttendanceSession
+class.AttendanceSession.stereotype=entity
+
+class.AttendanceSession.attribute.id.name=id
+class.AttendanceSession.attribute.id.type=UUID
+class.AttendanceSession.attribute.id.visibility=public
+class.AttendanceSession.attribute.id.primaryKey=true
+
+class.AttendanceSession.attribute.class_obj.name=class_obj
+class.AttendanceSession.attribute.class_obj.type=Class
+class.AttendanceSession.attribute.class_obj.visibility=public
+class.AttendanceSession.attribute.class_obj.relationship=ForeignKey
+
+class.AttendanceSession.attribute.session_type.name=session_type
+class.AttendanceSession.attribute.session_type.type=String
+class.AttendanceSession.attribute.session_type.visibility=public
+class.AttendanceSession.attribute.session_type.constraint=morning,afternoon,evening,custom
+
+class.AttendanceSession.attribute.date.name=date
+class.AttendanceSession.attribute.date.type=Date
+class.AttendanceSession.attribute.date.visibility=public
+
+# Attendance Class
+class.Attendance.package=AttendanceSystem
+class.Attendance.name=Attendance
+class.Attendance.stereotype=entity
+
+class.Attendance.attribute.id.name=id
+class.Attendance.attribute.id.type=UUID
+class.Attendance.attribute.id.visibility=public
+class.Attendance.attribute.id.primaryKey=true
+
+class.Attendance.attribute.student.name=student
+class.Attendance.attribute.student.type=User
+class.Attendance.attribute.student.visibility=public
+class.Attendance.attribute.student.relationship=ForeignKey
+
+class.Attendance.attribute.session.name=session
+class.Attendance.attribute.session.type=AttendanceSession
+class.Attendance.attribute.session.visibility=public
+class.Attendance.attribute.session.relationship=ForeignKey
+
+class.Attendance.attribute.status.name=status
+class.Attendance.attribute.status.type=String
+class.Attendance.attribute.status.visibility=public
+class.Attendance.attribute.status.constraint=present,absent,late,excused,pending
+
+class.Attendance.attribute.method.name=method
+class.Attendance.attribute.method.type=String
+class.Attendance.attribute.method.visibility=public
+class.Attendance.attribute.method.constraint=face_recognition,qr_code,peer_scan,manual,justification,location_verified,face_and_location
+
+class.Attendance.attribute.location_data.name=location_data
+class.Attendance.attribute.location_data.type=JSONField
+class.Attendance.attribute.location_data.visibility=public
+
+class.Attendance.attribute.confidence_score.name=confidence_score
+class.Attendance.attribute.confidence_score.type=Decimal
+class.Attendance.attribute.confidence_score.visibility=public
+
+# Face Recognition System Package
+package.FaceRecognitionSystem.name=Face Recognition System
+package.FaceRecognitionSystem.description=Biometric and camera-based face recognition system
+
+# FaceRegistration Class
+class.FaceRegistration.package=FaceRecognitionSystem
+class.FaceRegistration.name=FaceRegistration
+class.FaceRegistration.stereotype=entity
+
+class.FaceRegistration.attribute.id.name=id
+class.FaceRegistration.attribute.id.type=UUID
+class.FaceRegistration.attribute.id.visibility=public
+class.FaceRegistration.attribute.id.primaryKey=true
+
+class.FaceRegistration.attribute.user.name=user
+class.FaceRegistration.attribute.user.type=User
+class.FaceRegistration.attribute.user.visibility=public
+class.FaceRegistration.attribute.user.relationship=OneToOne
+
+class.FaceRegistration.attribute.auth_method.name=auth_method
+class.FaceRegistration.attribute.auth_method.type=String
+class.FaceRegistration.attribute.auth_method.visibility=public
+class.FaceRegistration.attribute.auth_method.constraint=camera,biometric
+
+class.FaceRegistration.attribute.device_type.name=device_type
+class.FaceRegistration.attribute.device_type.type=String
+class.FaceRegistration.attribute.device_type.visibility=public
+class.FaceRegistration.attribute.device_type.constraint=mobile,web,desktop
+
+class.FaceRegistration.attribute.face_encoding.name=face_encoding
+class.FaceRegistration.attribute.face_encoding.type=Text
+class.FaceRegistration.attribute.face_encoding.visibility=public
+
+class.FaceRegistration.attribute.biometric_id.name=biometric_id
+class.FaceRegistration.attribute.biometric_id.type=String
+class.FaceRegistration.attribute.biometric_id.visibility=public
+
+class.FaceRegistration.attribute.confidence_score.name=confidence_score
+class.FaceRegistration.attribute.confidence_score.type=Float
+class.FaceRegistration.attribute.confidence_score.visibility=public
+
+# FaceRegistration Methods
+class.FaceRegistration.operation.is_biometric_registration.name=is_biometric_registration
+class.FaceRegistration.operation.is_biometric_registration.returnType=Boolean
+class.FaceRegistration.operation.is_biometric_registration.visibility=public
+
+class.FaceRegistration.operation.is_camera_registration.name=is_camera_registration
+class.FaceRegistration.operation.is_camera_registration.returnType=Boolean
+class.FaceRegistration.operation.is_camera_registration.visibility=public
+
+# Chat System Package
+package.ChatSystem.name=Chat System
+package.ChatSystem.description=Mentor-student communication system
+
+# ChatRoom Class
+class.ChatRoom.package=ChatSystem
+class.ChatRoom.name=ChatRoom
+class.ChatRoom.stereotype=entity
+
+class.ChatRoom.attribute.student.name=student
+class.ChatRoom.attribute.student.type=User
+class.ChatRoom.attribute.student.visibility=public
+class.ChatRoom.attribute.student.relationship=ForeignKey
+
+class.ChatRoom.attribute.mentor.name=mentor
+class.ChatRoom.attribute.mentor.type=User
+class.ChatRoom.attribute.mentor.visibility=public
+class.ChatRoom.attribute.mentor.relationship=ForeignKey
+
+class.ChatRoom.attribute.is_active.name=is_active
+class.ChatRoom.attribute.is_active.type=Boolean
+class.ChatRoom.attribute.is_active.visibility=public
+
+# Message Class
+class.Message.package=ChatSystem
+class.Message.name=Message
+class.Message.stereotype=entity
+
+class.Message.attribute.chat_room.name=chat_room
+class.Message.attribute.chat_room.type=ChatRoom
+class.Message.attribute.chat_room.visibility=public
+class.Message.attribute.chat_room.relationship=ForeignKey
+
+class.Message.attribute.sender.name=sender
+class.Message.attribute.sender.type=User
+class.Message.attribute.sender.visibility=public
+class.Message.attribute.sender.relationship=ForeignKey
+
+class.Message.attribute.content.name=content
+class.Message.attribute.content.type=Text
+class.Message.attribute.content.visibility=public
+
+class.Message.attribute.message_type.name=message_type
+class.Message.attribute.message_type.type=String
+class.Message.attribute.message_type.visibility=public
+class.Message.attribute.message_type.constraint=text,image,file
+
+class.Message.attribute.is_read.name=is_read
+class.Message.attribute.is_read.type=Boolean
+class.Message.attribute.is_read.visibility=public
+
+# Message Methods
+class.Message.operation.mark_as_read.name=mark_as_read
+class.Message.operation.mark_as_read.returnType=void
+class.Message.operation.mark_as_read.visibility=public
+
+# Relationships
+relationship.User_UserProfile.type=OneToOne
+relationship.User_UserProfile.from=User
+relationship.User_UserProfile.to=UserProfile
+relationship.User_UserProfile.name=has
+
+relationship.User_FaceRegistration.type=OneToOne
+relationship.User_FaceRegistration.from=User
+relationship.User_FaceRegistration.to=FaceRegistration
+relationship.User_FaceRegistration.name=has
+
+relationship.Class_AttendanceSession.type=OneToMany
+relationship.Class_AttendanceSession.from=Class
+relationship.Class_AttendanceSession.to=AttendanceSession
+relationship.Class_AttendanceSession.name=contains
+
+relationship.AttendanceSession_Attendance.type=OneToMany
+relationship.AttendanceSession_Attendance.from=AttendanceSession
+relationship.AttendanceSession_Attendance.to=Attendance
+relationship.AttendanceSession_Attendance.name=has
+
+relationship.User_Attendance.type=OneToMany
+relationship.User_Attendance.from=User
+relationship.User_Attendance.to=Attendance
+relationship.User_Attendance.name=marks
+
+relationship.ChatRoom_Message.type=OneToMany
+relationship.ChatRoom_Message.from=ChatRoom
+relationship.ChatRoom_Message.to=Message
+relationship.ChatRoom_Message.name=contains
+
+relationship.User_ChatRoom_Student.type=OneToMany
+relationship.User_ChatRoom_Student.from=User
+relationship.User_ChatRoom_Student.to=ChatRoom
+relationship.User_ChatRoom_Student.name=participates_as_student
+
+relationship.User_ChatRoom_Mentor.type=OneToMany
+relationship.User_ChatRoom_Mentor.from=User
+relationship.User_ChatRoom_Mentor.to=ChatRoom
+relationship.User_ChatRoom_Mentor.name=participates_as_mentor
+
+relationship.User_Message.type=OneToMany
+relationship.User_Message.from=User
+relationship.User_Message.to=Message
+relationship.User_Message.name=sends
+
+# Diagram Layout
+diagram.ClassDiagram.name=Edynx Mobile App Class Diagram
+diagram.ClassDiagram.type=ClassDiagram
+diagram.ClassDiagram.package.UserManagement.x=50
+diagram.ClassDiagram.package.UserManagement.y=50
+diagram.ClassDiagram.package.AttendanceSystem.x=400
+diagram.ClassDiagram.package.AttendanceSystem.y=50
+diagram.ClassDiagram.package.FaceRecognitionSystem.x=50
+diagram.ClassDiagram.package.FaceRecognitionSystem.y=400
+diagram.ClassDiagram.package.ChatSystem.x=400
+diagram.ClassDiagram.package.ChatSystem.y=400

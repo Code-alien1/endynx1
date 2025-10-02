@@ -7,6 +7,87 @@ import json
 User = get_user_model()
 
 
+class FaceRegistration(models.Model):
+    """
+    Store face registration data including biometric authentication
+    """
+    AUTH_METHODS = [
+        ('camera', 'Camera-based'),
+        ('biometric', 'Biometric (Face ID/Touch ID)'),
+    ]
+    
+    DEVICE_TYPES = [
+        ('mobile', 'Mobile Device'),
+        ('web', 'Web Browser'),
+        ('desktop', 'Desktop Application'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='face_registration')
+    
+    # Authentication method and device info
+    auth_method = models.CharField(max_length=20, choices=AUTH_METHODS, default='camera')
+    device_type = models.CharField(max_length=20, choices=DEVICE_TYPES, default='mobile')
+    
+    # Face encoding data (for camera-based registration)
+    face_encoding = models.TextField(blank=True, help_text="Face encoding as JSON string")
+    
+    # Biometric data (for biometric-based registration)
+    biometric_id = models.CharField(max_length=255, blank=True, help_text="Hashed biometric identifier")
+    
+    # Metadata
+    confidence_score = models.FloatField(
+        default=0.0,
+        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
+        help_text="Confidence score of the registration"
+    )
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    last_authenticated = models.DateTimeField(null=True, blank=True)
+    
+    # Registration metadata
+    registration_ip = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'face_registrations'
+        verbose_name = 'Face Registration'
+        verbose_name_plural = 'Face Registrations'
+    
+    def __str__(self):
+        return f"Face registration for {self.user.get_full_name()} ({self.get_auth_method_display()})"
+    
+    def get_face_encoding_array(self):
+        """Convert JSON string back to array format"""
+        if not self.face_encoding:
+            return None
+        try:
+            return json.loads(self.face_encoding)
+        except (json.JSONDecodeError, TypeError):
+            return None
+    
+    def set_face_encoding_array(self, encoding_array):
+        """Convert array to JSON string for storage"""
+        if encoding_array is not None:
+            if hasattr(encoding_array, 'tolist'):
+                encoding_list = encoding_array.tolist()
+            else:
+                encoding_list = list(encoding_array)
+            self.face_encoding = json.dumps(encoding_list)
+        else:
+            self.face_encoding = ''
+    
+    def is_biometric_registration(self):
+        """Check if this is a biometric registration"""
+        return self.auth_method == 'biometric' and bool(self.biometric_id)
+    
+    def is_camera_registration(self):
+        """Check if this is a camera-based registration"""
+        return self.auth_method == 'camera' and bool(self.face_encoding)
+
+
 class FaceEncoding(models.Model):
     """
     Store face encodings for users with metadata

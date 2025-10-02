@@ -14,7 +14,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Icon from 'react-native-vector-icons/Ionicons';
 import EdynxLogo from '../../components/edynxLogo';
-import ExpoCameraFaceAuth from '../../components/ExpoCameraFaceAuth';
+import BiometricFaceAuth from '../../components/BiometricFaceAuth';
 import DottedGridBackground from '../../components/DottedGridBackground';
 import RoleSelector from '../../components/RoleSelector';
 import { styles } from '../../styles/auth.styles';
@@ -36,8 +36,13 @@ export default function LoginScreen() {
   };
 
   const handleFaceAuthSuccess = (userData?: any) => {
-    const target = getRoleRoute();
-    router.replace(target);
+    console.log('Face authentication successful, navigating...');
+    // Small delay to ensure state is updated
+    setTimeout(() => {
+      const target = getRoleRoute();
+      console.log('Face auth - Navigating to:', target);
+      router.replace(target);
+    }, 200);
   };
 
   const handleFaceAuthFallback = () => {
@@ -59,10 +64,17 @@ export default function LoginScreen() {
         ...loginData,
         role: selectedRole
       };
+      
+      console.log('Attempting login with:', loginPayload.email, 'Role:', loginPayload.role);
       await login(loginPayload);
-      // Use role-based routing after successful login
-      const target = getRoleRoute();
-      router.replace(target);
+      
+      // Wait a moment for state to update, then navigate
+      setTimeout(() => {
+        const target = getRoleRoute();
+        console.log('Navigating to:', target);
+        router.replace(target);
+      }, 200);
+      
     } catch (error) {
       console.error('Login failed:', error);
       // Error is already handled in AuthContext
@@ -177,14 +189,14 @@ export default function LoginScreen() {
         </DottedGridBackground>
       </KeyboardAvoidingView>
 
-      {/* Expo Camera Face Authentication Modal */}
-      <ExpoCameraFaceAuth
+      {/* Biometric Face Authentication Modal */}
+      <BiometricFaceAuth
         visible={showFaceAuth}
         onClose={() => setShowFaceAuth(false)}
         onSuccess={handleFaceAuthSuccess}
         mode="login"
         title="Face Authentication"
-        subtitle="Use your camera to authenticate with face recognition"
+        subtitle="Use your device biometric authentication to login"
       />
 
     </>

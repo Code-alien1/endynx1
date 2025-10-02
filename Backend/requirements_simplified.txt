@@ -1,0 +1,17 @@
+# Simplified requirements for geolocation and face recognition APIs
+# Essential packages only to avoid build issues
+
+# Geolocation and mapping
+geopy==2.3.0
+requests==2.31.0
+
+# Face Recognition APIs (cloud-based, no local processing)
+boto3==1.29.7  # AWS SDK for Rekognition
+azure-cognitiveservices-vision-face==0.6.0  # Azure Face API
+google-cloud-vision==3.4.4  # Google Cloud Vision API
+
+# Image processing (lightweight)
+Pillow==10.0.1
+
+# Additional utilities
+python-decouple==3.8  # For environment variables

@@ -9,8 +9,8 @@ export default function TabsIndex() {
 
   useEffect(() => {
     if (user) {
-      // Only redirect to setting for fallback, let other roles use their designated routes
-      router.replace('/(tabs)/setting');
+      // Redirect all users to dashboard as their default tab
+      router.replace('/(tabs)/dashboard');
     }
   }, [user, router]);
 

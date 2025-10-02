@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../constants/theme';
+import { apiService } from '../../services/api';
 
 interface Announcement {
   id: string;
@@ -34,6 +35,9 @@ export default function AnnouncementsTab() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+  
+  // Show create button only for administration role
+  const canCreateAnnouncement = user?.role === 'administration';
 
   const [announcementForm, setAnnouncementForm] = useState({
     title: '',
@@ -42,11 +46,29 @@ export default function AnnouncementsTab() {
 
   useEffect(() => {
     loadAnnouncements();
-  }, []);
+    
+    // Set up real-time polling for parents
+    let interval: ReturnType<typeof setInterval>;
+    if (user?.role === 'parent') {
+      interval = setInterval(() => {
+        loadAnnouncements();
+      }, 30000); // Refresh every 30 seconds for parents
+    }
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [user?.role]);
 
   const loadAnnouncements = async () => {
     try {
-      // Mock data for now
+      const response = await apiService.getAllAnnouncements();
+      setAnnouncements(response);
+    } catch (error) {
+      console.error('Error loading announcements:', error);
+      // Fallback to mock data for development
       setAnnouncements([
         {
           id: '1',
@@ -65,18 +87,27 @@ export default function AnnouncementsTab() {
           is_active: true,
         },
       ]);
-    } catch (error) {
-      console.error('Error loading announcements:', error);
     }
   };
 
   const handleCreateAnnouncement = async () => {
     try {
-      Alert.alert('Success', 'Announcement created successfully');
+      const newAnnouncement = await apiService.createAnnouncement(announcementForm);
+      
+      // Add the new announcement to the current list immediately
+      setAnnouncements(prev => [newAnnouncement, ...prev]);
+      
+      // Close modal and reset form
       setShowAnnouncementModal(false);
       resetAnnouncementForm();
-      loadAnnouncements();
+      
+      // Show success message without alert to prevent navigation issues
+      console.log('Announcement created successfully');
+      
+      // Refresh the list to ensure consistency with backend
+      await loadAnnouncements();
     } catch (error) {
+      console.error('Error creating announcement:', error);
       Alert.alert('Error', 'Failed to create announcement');
     }
   };
@@ -98,10 +129,12 @@ export default function AnnouncementsTab() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.pageTitle}>Announcements</Text>
-        <TouchableOpacity style={styles.addButton} onPress={() => setShowAnnouncementModal(true)}>
-          <Ionicons name="add" size={20} color="white" />
-          <Text style={styles.addButtonText}>New Announcement</Text>
-        </TouchableOpacity>
+        {canCreateAnnouncement && (
+          <TouchableOpacity style={styles.addButton} onPress={() => setShowAnnouncementModal(true)}>
+            <Ionicons name="add" size={20} color="white" />
+            <Text style={styles.addButtonText}>New Announcement</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <FlatList
@@ -117,7 +150,7 @@ export default function AnnouncementsTab() {
             </Text>
             <View style={styles.announcementMeta}>
               <Text style={styles.createdBy}>
-                By: {item.created_by.first_name} {item.created_by.last_name}
+                by IAI Administrator
               </Text>
               <View style={[styles.statusIndicator, { backgroundColor: item.is_active ? theme.colors.success : '#6B7280' }]} />
             </View>
@@ -251,6 +284,17 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontSize: 16,
     marginTop: 32,
+  },
+  footer: {
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  footerText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontStyle: 'italic',
   },
   modalOverlay: {
     flex: 1,

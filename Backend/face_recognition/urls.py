@@ -18,4 +18,5 @@ urlpatterns = [
     path('update/', views.update_face_registration, name='update_face_registration'),
     path('<str:user_id>/', views.delete_face_registration, name='delete_face_registration'),
     path('status/<str:user_id>/', views.face_registration_status, name='face_registration_status'),
+    
 ]

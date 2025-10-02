@@ -1,6 +1,8 @@
 from django.urls import path
 from . import views
 from .temp_views import TempFaceRecognitionAttendanceView
+from .enhanced_views import validate_location, mark_attendance_with_location, mark_attendance_with_face_and_location
+from . import biometric_views
 
 app_name = 'attendance'
 
@@ -50,4 +52,14 @@ urlpatterns = [
     
     # Predefined classes for dropdowns
     path('predefined-classes/', views.PredefinedClassesView.as_view(), name='predefined-classes'),
+    
+    # Enhanced Location and Face Recognition Endpoints
+    path('validate-location/', validate_location, name='validate-location'),
+    path('mark-with-location/', mark_attendance_with_location, name='mark-with-location'),
+    path('mark-with-face-and-location/', mark_attendance_with_face_and_location, name='mark-with-face-and-location'),
+    
+    # Simple Biometric Attendance (NO AUTH REQUIRED)
+    path('biometric-test/', biometric_views.biometric_test, name='biometric-test'),
+    path('biometric/', biometric_views.mark_biometric_attendance, name='biometric-attendance'),
+    path('sessions/<str:user_id>/', biometric_views.get_user_sessions, name='user-sessions'),
 ]

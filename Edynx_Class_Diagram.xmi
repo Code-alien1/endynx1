@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.0" xmlns:uml="http://www.eclipse.org/uml2/3.0.0/UML" xmlns:xmi="http://www.omg.org/XMI">
+  <uml:Model xmi:id="EdynxMobileApp" name="Edynx Mobile App">
+    
+    <!-- User Management Package -->
+    <packagedElement xmi:type="uml:Package" xmi:id="UserManagement" name="User Management">
+      
+      <!-- User Class -->
+      <packagedElement xmi:type="uml:Class" xmi:id="User" name="User">
+        <ownedAttribute xmi:id="User.id" name="id" type="UUID" visibility="public"/>
+        <ownedAttribute xmi:id="User.email" name="email" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="User.username" name="username" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="User.first_name" name="first_name" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="User.last_name" name="last_name" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="User.phone_number" name="phone_number" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="User.role" name="role" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="User.is_active" name="is_active" type="Boolean" visibility="public"/>
+        <ownedAttribute xmi:id="User.created_at" name="created_at" type="DateTime" visibility="public"/>
+        <ownedAttribute xmi:id="User.updated_at" name="updated_at" type="DateTime" visibility="public"/>
+        <ownedAttribute xmi:id="User.profile_picture" name="profile_picture" type="ImageField" visibility="public"/>
+        <ownedAttribute xmi:id="User.date_of_birth" name="date_of_birth" type="Date" visibility="public"/>
+        <ownedAttribute xmi:id="User.address" name="address" type="Text" visibility="public"/>
+        <ownedAttribute xmi:id="User.student_id" name="student_id" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="User.level" name="level" type="Integer" visibility="public"/>
+        <ownedAttribute xmi:id="User.class_name" name="class_name" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="User.teacher_id" name="teacher_id" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="User.subject_taught" name="subject_taught" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="User.department" name="department" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="User.mentor_id" name="mentor_id" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="User.rating" name="rating" type="Decimal" visibility="public"/>
+        <ownedAttribute xmi:id="User.admin_id" name="admin_id" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="User.position" name="position" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="User.face_encoding" name="face_encoding" type="Text" visibility="public"/>
+        <ownedAttribute xmi:id="User.face_image" name="face_image" type="ImageField" visibility="public"/>
+        
+        <ownedOperation xmi:id="User.get_full_name" name="get_full_name" visibility="public"/>
+        <ownedOperation xmi:id="User.is_student" name="is_student" visibility="public"/>
+        <ownedOperation xmi:id="User.is_parent" name="is_parent" visibility="public"/>
+        <ownedOperation xmi:id="User.is_teacher" name="is_teacher" visibility="public"/>
+        <ownedOperation xmi:id="User.is_mentor" name="is_mentor" visibility="public"/>
+        <ownedOperation xmi:id="User.is_administration" name="is_administration" visibility="public"/>
+        <ownedOperation xmi:id="User.can_have_mentor" name="can_have_mentor" visibility="public"/>
+      </packagedElement>
+      
+      <!-- UserProfile Class -->
+      <packagedElement xmi:type="uml:Class" xmi:id="UserProfile" name="UserProfile">
+        <ownedAttribute xmi:id="UserProfile.user" name="user" type="User" visibility="public"/>
+        <ownedAttribute xmi:id="UserProfile.bio" name="bio" type="Text" visibility="public"/>
+        <ownedAttribute xmi:id="UserProfile.emergency_contact" name="emergency_contact" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="UserProfile.emergency_contact_name" name="emergency_contact_name" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="UserProfile.gpa" name="gpa" type="Decimal" visibility="public"/>
+        <ownedAttribute xmi:id="UserProfile.academic_year" name="academic_year" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="UserProfile.experience_years" name="experience_years" type="Integer" visibility="public"/>
+        <ownedAttribute xmi:id="UserProfile.qualifications" name="qualifications" type="Text" visibility="public"/>
+        <ownedAttribute xmi:id="UserProfile.specializations" name="specializations" type="Text" visibility="public"/>
+        <ownedAttribute xmi:id="UserProfile.created_at" name="created_at" type="DateTime" visibility="public"/>
+        <ownedAttribute xmi:id="UserProfile.updated_at" name="updated_at" type="DateTime" visibility="public"/>
+      </packagedElement>
+      
+      <!-- UserSession Class -->
+      <packagedElement xmi:type="uml:Class" xmi:id="UserSession" name="UserSession">
+        <ownedAttribute xmi:id="UserSession.user" name="user" type="User" visibility="public"/>
+        <ownedAttribute xmi:id="UserSession.session_key" name="session_key" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="UserSession.device_info" name="device_info" type="Text" visibility="public"/>
+        <ownedAttribute xmi:id="UserSession.ip_address" name="ip_address" type="GenericIPAddress" visibility="public"/>
+        <ownedAttribute xmi:id="UserSession.user_agent" name="user_agent" type="Text" visibility="public"/>
+        <ownedAttribute xmi:id="UserSession.is_active" name="is_active" type="Boolean" visibility="public"/>
+        <ownedAttribute xmi:id="UserSession.created_at" name="created_at" type="DateTime" visibility="public"/>
+        <ownedAttribute xmi:id="UserSession.last_activity" name="last_activity" type="DateTime" visibility="public"/>
+      </packagedElement>
+    </packagedElement>
+    
+    <!-- Attendance System Package -->
+    <packagedElement xmi:type="uml:Package" xmi:id="AttendanceSystem" name="Attendance System">
+      
+      <!-- Class -->
+      <packagedElement xmi:type="uml:Class" xmi:id="Class" name="Class">
+        <ownedAttribute xmi:id="Class.id" name="id" type="UUID" visibility="public"/>
+        <ownedAttribute xmi:id="Class.name" name="name" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="Class.level" name="level" type="Integer" visibility="public"/>
+        <ownedAttribute xmi:id="Class.teacher" name="teacher" type="User" visibility="public"/>
+        <ownedAttribute xmi:id="Class.created_at" name="created_at" type="DateTime" visibility="public"/>
+        <ownedAttribute xmi:id="Class.updated_at" name="updated_at" type="DateTime" visibility="public"/>
+      </packagedElement>
+      
+      <!-- AttendanceSession -->
+      <packagedElement xmi:type="uml:Class" xmi:id="AttendanceSession" name="AttendanceSession">
+        <ownedAttribute xmi:id="AttendanceSession.id" name="id" type="UUID" visibility="public"/>
+        <ownedAttribute xmi:id="AttendanceSession.class_obj" name="class_obj" type="Class" visibility="public"/>
+        <ownedAttribute xmi:id="AttendanceSession.session_type" name="session_type" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="AttendanceSession.date" name="date" type="Date" visibility="public"/>
+        <ownedAttribute xmi:id="AttendanceSession.start_time" name="start_time" type="Time" visibility="public"/>
+        <ownedAttribute xmi:id="AttendanceSession.end_time" name="end_time" type="Time" visibility="public"/>
+        <ownedAttribute xmi:id="AttendanceSession.is_active" name="is_active" type="Boolean" visibility="public"/>
+        <ownedAttribute xmi:id="AttendanceSession.created_by" name="created_by" type="User" visibility="public"/>
+        <ownedAttribute xmi:id="AttendanceSession.created_at" name="created_at" type="DateTime" visibility="public"/>
+        <ownedAttribute xmi:id="AttendanceSession.updated_at" name="updated_at" type="DateTime" visibility="public"/>
+      </packagedElement>
+      
+      <!-- Attendance -->
+      <packagedElement xmi:type="uml:Class" xmi:id="Attendance" name="Attendance">
+        <ownedAttribute xmi:id="Attendance.id" name="id" type="UUID" visibility="public"/>
+        <ownedAttribute xmi:id="Attendance.student" name="student" type="User" visibility="public"/>
+        <ownedAttribute xmi:id="Attendance.session" name="session" type="AttendanceSession" visibility="public"/>
+        <ownedAttribute xmi:id="Attendance.status" name="status" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="Attendance.method" name="method" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="Attendance.timestamp" name="timestamp" type="DateTime" visibility="public"/>
+        <ownedAttribute xmi:id="Attendance.location" name="location" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="Attendance.location_data" name="location_data" type="JSONField" visibility="public"/>
+        <ownedAttribute xmi:id="Attendance.confidence_score" name="confidence_score" type="Decimal" visibility="public"/>
+        <ownedAttribute xmi:id="Attendance.verified_by" name="verified_by" type="User" visibility="public"/>
+        <ownedAttribute xmi:id="Attendance.verified_at" name="verified_at" type="DateTime" visibility="public"/>
+        <ownedAttribute xmi:id="Attendance.notes" name="notes" type="Text" visibility="public"/>
+      </packagedElement>
+      
+      <!-- AbsenceJustification -->
+      <packagedElement xmi:type="uml:Class" xmi:id="AbsenceJustification" name="AbsenceJustification">
+        <ownedAttribute xmi:id="AbsenceJustification.id" name="id" type="UUID" visibility="public"/>
+        <ownedAttribute xmi:id="AbsenceJustification.student" name="student" type="User" visibility="public"/>
+        <ownedAttribute xmi:id="AbsenceJustification.attendance" name="attendance" type="Attendance" visibility="public"/>
+        <ownedAttribute xmi:id="AbsenceJustification.reason" name="reason" type="Text" visibility="public"/>
+        <ownedAttribute xmi:id="AbsenceJustification.photo" name="photo" type="ImageField" visibility="public"/>
+        <ownedAttribute xmi:id="AbsenceJustification.status" name="status" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="AbsenceJustification.reviewed_by" name="reviewed_by" type="User" visibility="public"/>
+        <ownedAttribute xmi:id="AbsenceJustification.reviewed_at" name="reviewed_at" type="DateTime" visibility="public"/>
+        <ownedAttribute xmi:id="AbsenceJustification.review_notes" name="review_notes" type="Text" visibility="public"/>
+        <ownedAttribute xmi:id="AbsenceJustification.submitted_at" name="submitted_at" type="DateTime" visibility="public"/>
+      </packagedElement>
+    </packagedElement>
+    
+    <!-- Face Recognition System Package -->
+    <packagedElement xmi:type="uml:Package" xmi:id="FaceRecognitionSystem" name="Face Recognition System">
+      
+      <!-- FaceRegistration -->
+      <packagedElement xmi:type="uml:Class" xmi:id="FaceRegistration" name="FaceRegistration">
+        <ownedAttribute xmi:id="FaceRegistration.id" name="id" type="UUID" visibility="public"/>
+        <ownedAttribute xmi:id="FaceRegistration.user" name="user" type="User" visibility="public"/>
+        <ownedAttribute xmi:id="FaceRegistration.auth_method" name="auth_method" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="FaceRegistration.device_type" name="device_type" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="FaceRegistration.face_encoding" name="face_encoding" type="Text" visibility="public"/>
+        <ownedAttribute xmi:id="FaceRegistration.biometric_id" name="biometric_id" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="FaceRegistration.confidence_score" name="confidence_score" type="Float" visibility="public"/>
+        <ownedAttribute xmi:id="FaceRegistration.created_at" name="created_at" type="DateTime" visibility="public"/>
+        <ownedAttribute xmi:id="FaceRegistration.updated_at" name="updated_at" type="DateTime" visibility="public"/>
+        <ownedAttribute xmi:id="FaceRegistration.last_authenticated" name="last_authenticated" type="DateTime" visibility="public"/>
+        <ownedAttribute xmi:id="FaceRegistration.registration_ip" name="registration_ip" type="GenericIPAddress" visibility="public"/>
+        <ownedAttribute xmi:id="FaceRegistration.user_agent" name="user_agent" type="Text" visibility="public"/>
+        
+        <ownedOperation xmi:id="FaceRegistration.get_face_encoding_array" name="get_face_encoding_array" visibility="public"/>
+        <ownedOperation xmi:id="FaceRegistration.set_face_encoding_array" name="set_face_encoding_array" visibility="public"/>
+        <ownedOperation xmi:id="FaceRegistration.is_biometric_registration" name="is_biometric_registration" visibility="public"/>
+        <ownedOperation xmi:id="FaceRegistration.is_camera_registration" name="is_camera_registration" visibility="public"/>
+      </packagedElement>
+      
+      <!-- FaceRecognitionAttempt -->
+      <packagedElement xmi:type="uml:Class" xmi:id="FaceRecognitionAttempt" name="FaceRecognitionAttempt">
+        <ownedAttribute xmi:id="FaceRecognitionAttempt.id" name="id" type="UUID" visibility="public"/>
+        <ownedAttribute xmi:id="FaceRecognitionAttempt.user" name="user" type="User" visibility="public"/>
+        <ownedAttribute xmi:id="FaceRecognitionAttempt.attempt_type" name="attempt_type" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="FaceRecognitionAttempt.result" name="result" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="FaceRecognitionAttempt.confidence_score" name="confidence_score" type="Float" visibility="public"/>
+        <ownedAttribute xmi:id="FaceRecognitionAttempt.ip_address" name="ip_address" type="GenericIPAddress" visibility="public"/>
+        <ownedAttribute xmi:id="FaceRecognitionAttempt.user_agent" name="user_agent" type="Text" visibility="public"/>
+        <ownedAttribute xmi:id="FaceRecognitionAttempt.device_info" name="device_info" type="Text" visibility="public"/>
+        <ownedAttribute xmi:id="FaceRecognitionAttempt.processing_time" name="processing_time" type="Float" visibility="public"/>
+        <ownedAttribute xmi:id="FaceRecognitionAttempt.timestamp" name="timestamp" type="DateTime" visibility="public"/>
+        <ownedAttribute xmi:id="FaceRecognitionAttempt.error_message" name="error_message" type="Text" visibility="public"/>
+      </packagedElement>
+    </packagedElement>
+    
+    <!-- Chat System Package -->
+    <packagedElement xmi:type="uml:Package" xmi:id="ChatSystem" name="Chat System">
+      
+      <!-- ChatRoom -->
+      <packagedElement xmi:type="uml:Class" xmi:id="ChatRoom" name="ChatRoom">
+        <ownedAttribute xmi:id="ChatRoom.student" name="student" type="User" visibility="public"/>
+        <ownedAttribute xmi:id="ChatRoom.mentor" name="mentor" type="User" visibility="public"/>
+        <ownedAttribute xmi:id="ChatRoom.created_at" name="created_at" type="DateTime" visibility="public"/>
+        <ownedAttribute xmi:id="ChatRoom.updated_at" name="updated_at" type="DateTime" visibility="public"/>
+        <ownedAttribute xmi:id="ChatRoom.is_active" name="is_active" type="Boolean" visibility="public"/>
+        
+        <ownedOperation xmi:id="ChatRoom.last_message" name="last_message" visibility="public"/>
+      </packagedElement>
+      
+      <!-- Message -->
+      <packagedElement xmi:type="uml:Class" xmi:id="Message" name="Message">
+        <ownedAttribute xmi:id="Message.chat_room" name="chat_room" type="ChatRoom" visibility="public"/>
+        <ownedAttribute xmi:id="Message.sender" name="sender" type="User" visibility="public"/>
+        <ownedAttribute xmi:id="Message.content" name="content" type="Text" visibility="public"/>
+        <ownedAttribute xmi:id="Message.timestamp" name="timestamp" type="DateTime" visibility="public"/>
+        <ownedAttribute xmi:id="Message.is_read" name="is_read" type="Boolean" visibility="public"/>
+        <ownedAttribute xmi:id="Message.message_type" name="message_type" type="String" visibility="public"/>
+        <ownedAttribute xmi:id="Message.attachment" name="attachment" type="FileField" visibility="public"/>
+        
+        <ownedOperation xmi:id="Message.mark_as_read" name="mark_as_read" visibility="public"/>
+      </packagedElement>
+      
+      <!-- MentorAssignment -->
+      <packagedElement xmi:type="uml:Class" xmi:id="MentorAssignment" name="MentorAssignment">
+        <ownedAttribute xmi:id="MentorAssignment.student" name="student" type="User" visibility="public"/>
+        <ownedAttribute xmi:id="MentorAssignment.mentor" name="mentor" type="User" visibility="public"/>
+        <ownedAttribute xmi:id="MentorAssignment.assigned_by" name="assigned_by" type="User" visibility="public"/>
+        <ownedAttribute xmi:id="MentorAssignment.assigned_at" name="assigned_at" type="DateTime" visibility="public"/>
+        <ownedAttribute xmi:id="MentorAssignment.is_active" name="is_active" type="Boolean" visibility="public"/>
+        <ownedAttribute xmi:id="MentorAssignment.notes" name="notes" type="Text" visibility="public"/>
+      </packagedElement>
+    </packagedElement>
+    
+    <!-- Associations -->
+    <packagedElement xmi:type="uml:Association" xmi:id="User_UserProfile" name="has">
+      <memberEnd xmi:idref="User_UserProfile_User"/>
+      <memberEnd xmi:idref="User_UserProfile_UserProfile"/>
+      <ownedEnd xmi:id="User_UserProfile_User" type="User" aggregation="none">
+        <lowerValue xmi:type="uml:LiteralInteger" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="User_UserProfile_UserProfile" type="UserProfile" aggregation="none">
+        <lowerValue xmi:type="uml:LiteralInteger" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    
+    <packagedElement xmi:type="uml:Association" xmi:id="User_FaceRegistration" name="has">
+      <memberEnd xmi:idref="User_FaceRegistration_User"/>
+      <memberEnd xmi:idref="User_FaceRegistration_FaceRegistration"/>
+      <ownedEnd xmi:id="User_FaceRegistration_User" type="User" aggregation="none">
+        <lowerValue xmi:type="uml:LiteralInteger" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="User_FaceRegistration_FaceRegistration" type="FaceRegistration" aggregation="none">
+        <lowerValue xmi:type="uml:LiteralInteger" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    
+    <packagedElement xmi:type="uml:Association" xmi:id="Class_AttendanceSession" name="contains">
+      <memberEnd xmi:idref="Class_AttendanceSession_Class"/>
+      <memberEnd xmi:idref="Class_AttendanceSession_AttendanceSession"/>
+      <ownedEnd xmi:id="Class_AttendanceSession_Class" type="Class" aggregation="none">
+        <lowerValue xmi:type="uml:LiteralInteger" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="Class_AttendanceSession_AttendanceSession" type="AttendanceSession" aggregation="none">
+        <lowerValue xmi:type="uml:LiteralInteger" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="*"/>
+      </ownedEnd>
+    </packagedElement>
+    
+    <packagedElement xmi:type="uml:Association" xmi:id="AttendanceSession_Attendance" name="has">
+      <memberEnd xmi:idref="AttendanceSession_Attendance_AttendanceSession"/>
+      <memberEnd xmi:idref="AttendanceSession_Attendance_Attendance"/>
+      <ownedEnd xmi:id="AttendanceSession_Attendance_AttendanceSession" type="AttendanceSession" aggregation="none">
+        <lowerValue xmi:type="uml:LiteralInteger" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="AttendanceSession_Attendance_Attendance" type="Attendance" aggregation="none">
+        <lowerValue xmi:type="uml:LiteralInteger" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="*"/>
+      </ownedEnd>
+    </packagedElement>
+    
+    <packagedElement xmi:type="uml:Association" xmi:id="ChatRoom_Message" name="contains">
+      <memberEnd xmi:idref="ChatRoom_Message_ChatRoom"/>
+      <memberEnd xmi:idref="ChatRoom_Message_Message"/>
+      <ownedEnd xmi:id="ChatRoom_Message_ChatRoom" type="ChatRoom" aggregation="none">
+        <lowerValue xmi:type="uml:LiteralInteger" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="1"/>
+      </ownedEnd>
+      <ownedEnd xmi:id="ChatRoom_Message_Message" type="Message" aggregation="none">
+        <lowerValue xmi:type="uml:LiteralInteger" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" value="*"/>
+      </ownedEnd>
+    </packagedElement>
+    
+  </uml:Model>
+</xmi:XMI>

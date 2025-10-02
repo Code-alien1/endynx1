@@ -21,9 +21,6 @@ This implementation uses **expo-camera** to capture photos and sends them to you
 // Main API methods
 - authenticateWithFace(imageUri: string): Promise<FaceRecognitionResponse>
 - registerFace(imageUri: string, userId: number): Promise<FaceRegistrationResponse>
-- updateFaceRegistration(imageUri: string, userId: number)
-- deleteFaceRegistration(userId: number)
-- getFaceRegistrationStatus(userId: number)
 ```
 
 #### **2. Expo Camera Component** (`components/ExpoCameraFaceAuth.tsx`)

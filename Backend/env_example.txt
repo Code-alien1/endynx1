@@ -1,0 +1,26 @@
+# Environment Variables Example
+# Copy this file to .env and update with your actual values
+
+# Database
+DATABASE_URL=sqlite:///db.sqlite3
+
+# Django
+SECRET_KEY=your-secret-key-here
+DEBUG=True
+
+# AWS Rekognition
+AWS_ACCESS_KEY_ID=your-aws-access-key-id
+AWS_SECRET_ACCESS_KEY=your-aws-secret-access-key
+AWS_REGION=us-east-1
+
+# Azure Face API
+AZURE_FACE_API_KEY=your-azure-face-api-key
+AZURE_FACE_ENDPOINT=https://your-region.api.cognitive.microsoft.com/
+
+# Google Cloud Vision
+GOOGLE_APPLICATION_CREDENTIALS=path/to/your/service-account-key.json
+
+# School Location (Update with actual coordinates)
+SCHOOL_LATITUDE=33.5731
+SCHOOL_LONGITUDE=-7.5898
+SCHOOL_RADIUS_METERS=500

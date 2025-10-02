@@ -1,0 +1,19 @@
+# Enhanced requirements for geolocation and face recognition APIs
+# Add these to your existing requirements.txt
+
+# Geolocation and mapping
+geopy==2.3.0
+requests==2.31.0
+
+# Face Recognition APIs
+boto3==1.29.7  # AWS SDK for Rekognition
+azure-cognitiveservices-vision-face==0.6.0  # Azure Face API
+google-cloud-vision==3.4.4  # Google Cloud Vision API
+
+# Image processing
+Pillow==10.0.1
+opencv-python==4.8.1.78
+
+# Additional utilities
+python-decouple==3.8  # For environment variables
+cryptography==41.0.7  # For secure API key handling

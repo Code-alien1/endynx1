@@ -84,7 +84,7 @@ export default function MentorScreen({}: MentorScreenProps) {
           
           // Get mentor info using mentor_id from assignment
           try {
-            const mentorResponse = await apiService.get(`/users/${userAssignment.mentor_id}/`);
+            const mentorResponse = await apiService.get(`/edynx-admin/users/${userAssignment.mentor_id}/`);
             console.log('Mentor data loaded:', mentorResponse.data);
             setSelectedMentor(mentorResponse.data);
           } catch (mentorError) {

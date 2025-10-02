@@ -95,7 +95,7 @@ class AbsenceJustificationSerializer(serializers.ModelSerializer):
             'photo', 'status', 'reviewed_by', 'reviewed_by_name', 'reviewed_at',
             'review_notes', 'submitted_at'
         ]
-        read_only_fields = ['id', 'submitted_at', 'reviewed_at']
+        read_only_fields = ['id', 'student', 'submitted_at', 'reviewed_at']
 
 
 class AttendanceStatisticsSerializer(serializers.ModelSerializer):

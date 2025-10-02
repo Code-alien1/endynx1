@@ -1,0 +1,391 @@
+@startuml Edynx_Mobile_App_Class_Diagram
+
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam class {
+    BackgroundColor #E8F4FD
+    BorderColor #2E86AB
+    ArrowColor #2E86AB
+}
+
+title Edynx Mobile App - Complete Class Diagram
+
+package "User Management" {
+    class User {
+        +id: UUID (PK)
+        +email: String (unique)
+        +username: String
+        +first_name: String
+        +last_name: String
+        +phone_number: String
+        +role: String [student, parent, teacher, mentor, administration, superadmin]
+        +is_active: Boolean
+        +created_at: DateTime
+        +updated_at: DateTime
+        +profile_picture: ImageField
+        +date_of_birth: Date
+        +address: Text
+        --Student Fields--
+        +student_id: String (unique)
+        +level: Integer [1,2,3]
+        +class_name: String
+        +parent: FK(User)
+        --Teacher Fields--
+        +teacher_id: String (unique)
+        +subject_taught: String
+        +department: String
+        --Mentor Fields--
+        +mentor_id: String (unique)
+        +rating: Decimal
+        +total_ratings: Integer
+        --Admin Fields--
+        +admin_id: String (unique)
+        +position: String
+        --Face Recognition--
+        +face_encoding: Text
+        +face_image: ImageField
+        --Methods--
+        +get_full_name(): String
+        +is_student(): Boolean
+        +is_parent(): Boolean
+        +is_teacher(): Boolean
+        +is_mentor(): Boolean
+        +is_administration(): Boolean
+        +can_have_mentor(): Boolean
+        +get_available_mentor_levels(): List
+    }
+
+    class UserProfile {
+        +user: OneToOne(User)
+        +bio: Text
+        +emergency_contact: String
+        +emergency_contact_name: String
+        +gpa: Decimal
+        +academic_year: String
+        +experience_years: Integer
+        +qualifications: Text
+        +specializations: Text
+        +created_at: DateTime
+        +updated_at: DateTime
+    }
+
+    class UserSession {
+        +user: FK(User)
+        +session_key: String (unique)
+        +device_info: Text
+        +ip_address: GenericIPAddress
+        +user_agent: Text
+        +is_active: Boolean
+        +created_at: DateTime
+        +last_activity: DateTime
+    }
+}
+
+package "Attendance System" {
+    class Class {
+        +id: UUID (PK)
+        +name: String
+        +level: Integer [1,2,3]
+        +teacher: FK(User)
+        +created_at: DateTime
+        +updated_at: DateTime
+        --Methods--
+        +__str__(): String
+    }
+
+    class AttendanceSession {
+        +id: UUID (PK)
+        +class_obj: FK(Class)
+        +session_type: String [morning, afternoon, evening, custom]
+        +date: Date
+        +start_time: Time
+        +end_time: Time
+        +is_active: Boolean
+        +created_by: FK(User)
+        +created_at: DateTime
+        +updated_at: DateTime
+        --Methods--
+        +__str__(): String
+    }
+
+    class Attendance {
+        +id: UUID (PK)
+        +student: FK(User)
+        +session: FK(AttendanceSession)
+        +status: String [present, absent, late, excused, pending]
+        +method: String [face_recognition, qr_code, peer_scan, manual, justification, location_verified, face_and_location]
+        +timestamp: DateTime
+        +location: String
+        +location_data: JSONField
+        +confidence_score: Decimal
+        +verified_by: FK(User)
+        +verified_at: DateTime
+        +notes: Text
+        --Methods--
+        +__str__(): String
+    }
+
+    class QRCode {
+        +id: UUID (PK)
+        +session: FK(AttendanceSession)
+        +code: String (unique)
+        +is_active: Boolean
+        +created_at: DateTime
+        +expires_at: DateTime
+        --Methods--
+        +__str__(): String
+    }
+
+    class AbsenceJustification {
+        +id: UUID (PK)
+        +student: FK(User)
+        +attendance: OneToOne(Attendance)
+        +reason: Text
+        +photo: ImageField
+        +status: String [pending, approved, rejected]
+        +reviewed_by: FK(User)
+        +reviewed_at: DateTime
+        +review_notes: Text
+        +submitted_at: DateTime
+        --Methods--
+        +__str__(): String
+    }
+
+    class AttendanceStatistics {
+        +id: UUID (PK)
+        +student: FK(User)
+        +class_obj: FK(Class)
+        +total_sessions: Integer
+        +present_count: Integer
+        +absent_count: Integer
+        +late_count: Integer
+        +excused_count: Integer
+        +attendance_rate: Decimal
+        +period_start: Date
+        +period_end: Date
+        +calculated_at: DateTime
+        --Methods--
+        +__str__(): String
+    }
+
+    class FaceRecognitionLog {
+        +id: UUID (PK)
+        +student: FK(User)
+        +session: FK(AttendanceSession)
+        +confidence_score: Decimal
+        +success: Boolean
+        +image_data: Text
+        +device_info: Text
+        +ip_address: GenericIPAddress
+        +timestamp: DateTime
+        --Methods--
+        +__str__(): String
+    }
+
+    class PeerAttendanceLog {
+        +id: UUID (PK)
+        +scanner: FK(User)
+        +scanned_student: FK(User)
+        +session: FK(AttendanceSession)
+        +success: Boolean
+        +notes: Text
+        +timestamp: DateTime
+        --Methods--
+        +__str__(): String
+    }
+}
+
+package "Face Recognition System" {
+    class FaceRegistration {
+        +id: UUID (PK)
+        +user: OneToOne(User)
+        +auth_method: String [camera, biometric]
+        +device_type: String [mobile, web, desktop]
+        +face_encoding: Text
+        +biometric_id: String
+        +confidence_score: Float
+        +created_at: DateTime
+        +updated_at: DateTime
+        +last_authenticated: DateTime
+        +registration_ip: GenericIPAddress
+        +user_agent: Text
+        --Methods--
+        +get_face_encoding_array(): Array
+        +set_face_encoding_array(encoding): void
+        +is_biometric_registration(): Boolean
+        +is_camera_registration(): Boolean
+        +__str__(): String
+    }
+
+    class FaceEncoding {
+        +id: UUID (PK)
+        +user: OneToOne(User)
+        +encoding_data: Text
+        +confidence_score: Float
+        +image_quality: Float
+        +registration_date: DateTime
+        +last_updated: DateTime
+        +update_count: Integer
+        +source_image_width: Integer
+        +source_image_height: Integer
+        +source_image_format: String
+        +face_landmarks_count: Integer
+        +face_bounding_box: Text
+        --Methods--
+        +get_encoding_array(): Array
+        +set_encoding_array(encoding): void
+        +get_bounding_box(): Dict
+        +set_bounding_box(bbox): void
+        +__str__(): String
+    }
+
+    class FaceRecognitionAttempt {
+        +id: UUID (PK)
+        +user: FK(User)
+        +attempt_type: String [authentication, registration, update]
+        +result: String [success, failed, no_face, multiple_faces, low_quality, no_match, error]
+        +confidence_score: Float
+        +ip_address: GenericIPAddress
+        +user_agent: Text
+        +device_info: Text
+        +image_size: Integer
+        +image_width: Integer
+        +image_height: Integer
+        +faces_detected: Integer
+        +processing_time: Float
+        +timestamp: DateTime
+        +error_message: Text
+        --Methods--
+        +__str__(): String
+    }
+
+    class FaceRecognitionSettings {
+        +recognition_threshold: Float
+        +min_image_width: Integer
+        +min_image_height: Integer
+        +max_image_size: Integer
+        +min_face_size: Integer
+        +max_faces_allowed: Integer
+        +max_attempts_per_minute: Integer
+        +max_failed_attempts: Integer
+        +lockout_duration: Integer
+        +enable_face_recognition: Boolean
+        +enable_logging: Boolean
+        +enable_image_storage: Boolean
+        +created_at: DateTime
+        +updated_at: DateTime
+        --Methods--
+        +get_settings(): FaceRecognitionSettings
+        +__str__(): String
+    }
+
+    class FaceRecognitionAuditLog {
+        +id: UUID (PK)
+        +user: FK(User)
+        +admin_user: FK(User)
+        +action_type: String [registration, update, deletion, authentication, settings_change, system_error]
+        +description: Text
+        +ip_address: GenericIPAddress
+        +user_agent: Text
+        +additional_data: Text
+        +timestamp: DateTime
+        --Methods--
+        +__str__(): String
+    }
+}
+
+package "Chat System" {
+    class ChatRoom {
+        +student: FK(User)
+        +mentor: FK(User)
+        +created_at: DateTime
+        +updated_at: DateTime
+        +is_active: Boolean
+        --Properties--
+        +last_message: Message
+        --Methods--
+        +__str__(): String
+    }
+
+    class Message {
+        +chat_room: FK(ChatRoom)
+        +sender: FK(User)
+        +content: Text
+        +timestamp: DateTime
+        +is_read: Boolean
+        +message_type: String [text, image, file]
+        +attachment: FileField
+        --Methods--
+        +mark_as_read(): void
+        +__str__(): String
+    }
+
+    class MentorAssignment {
+        +student: FK(User)
+        +mentor: FK(User)
+        +assigned_by: FK(User)
+        +assigned_at: DateTime
+        +is_active: Boolean
+        +notes: Text
+        --Methods--
+        +save(): void
+        +__str__(): String
+    }
+
+    class MentorRating {
+        +mentor: FK(User)
+        +student: FK(User)
+        +rating: Integer [1-5]
+        +comment: Text
+        +timestamp: DateTime
+        +reviewed_by_admin: Boolean
+        +admin_notes: Text
+        --Methods--
+        +__str__(): String
+    }
+}
+
+' Relationships
+User ||--o{ UserProfile : has
+User ||--o{ UserSession : has
+User ||--o{ Class : teaches
+User }o--o{ Class : enrolled_in
+User ||--o{ AttendanceSession : creates
+User ||--o{ Attendance : has
+User ||--o{ AbsenceJustification : submits
+User ||--o{ AttendanceStatistics : has
+User ||--o{ FaceRecognitionLog : has
+User ||--|| FaceRegistration : has
+User ||--|| FaceEncoding : has
+User ||--o{ FaceRecognitionAttempt : has
+User ||--o{ FaceRecognitionAuditLog : has
+User ||--o{ ChatRoom : participates_in
+User ||--o{ Message : sends
+User ||--o{ MentorAssignment : assigned_to
+User ||--o{ MentorRating : rates
+
+Class ||--o{ AttendanceSession : has
+AttendanceSession ||--o{ Attendance : contains
+AttendanceSession ||--o{ QRCode : has
+AttendanceSession ||--o{ FaceRecognitionLog : logs
+AttendanceSession ||--o{ PeerAttendanceLog : logs
+Attendance ||--|| AbsenceJustification : justified_by
+
+ChatRoom ||--o{ Message : contains
+MentorAssignment ||--|| ChatRoom : creates
+
+' Parent-Child relationships
+User ||--o{ User : parent_of
+
+' Mentor-Mentee relationships  
+User }o--o{ User : mentors
+
+note top of User : Central user model supporting\n6 roles with role-specific fields\nand face recognition capabilities
+
+note top of FaceRegistration : Supports both camera-based\nand biometric authentication\n(Face ID/Touch ID)
+
+note top of Attendance : Enhanced with geolocation\nand multiple authentication\nmethods including biometrics
+
+note top of ChatRoom : Enables mentor-student\ncommunication with\nautomatic room creation
+
+@enduml

@@ -175,27 +175,48 @@ export default function AbsencesScreen() {
 
     setIsSubmitting(true);
     try {
-      const justificationData: JustificationSubmission = {
-        absence_id: selectedAbsenceId || 'general',
+      console.log('Submitting justification:', {
+        selectedAbsenceId,
         reason: justificationReason,
-        photo_uri: selectedPhoto || undefined,
-        photo_base64: selectedPhoto ? 'mock-base64-data' : undefined
-      };
+        photo: selectedPhoto
+      });
+
+      // Create justification without specific attendance record (general justification)
+      const formData = new FormData();
+      formData.append('reason', justificationReason);
       
-      const response = await apiService.submitAbsenceJustification(
-        justificationData.absence_id,
-        justificationData.reason,
-        justificationData.photo_base64 || ''
-      );
+      // Add photo if selected
+      if (selectedPhoto) {
+        const filename = selectedPhoto.split('/').pop() || 'justification.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
+        
+        formData.append('photo', {
+          uri: selectedPhoto,
+          name: filename,
+          type: type,
+        } as any);
+      }
+      
+      console.log('Submitting FormData with reason and photo (no attendance record required)');
+      
+      // Use FormData for file upload - student field will be set automatically by backend
+      const response = await apiService.api.post('/attendance/justifications/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      console.log('Justification submitted successfully:', response.data);
 
       // Update local state to show submitted justification
       const newJustification = {
-        id: Date.now().toString(),
+        id: response.data.id || Date.now().toString(),
         student_id: user?.id,
         student_name: user?.username || user?.email || 'Student',
-        absence_id: justificationData.absence_id,
-        reason: justificationData.reason,
-        photo_uri: justificationData.photo_uri,
+        absence_id: selectedAbsenceId || 'general',
+        reason: justificationReason,
+        photo_uri: selectedPhoto,
         status: 'pending',
         submitted_at: new Date().toISOString(),
         admin_comment: null
@@ -219,9 +240,27 @@ export default function AbsencesScreen() {
           }
         ]
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting justification:', error);
-      Alert.alert('Error', 'Failed to submit justification. Please try again.');
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      
+      let errorMessage = 'Failed to submit justification. Please try again.';
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.response?.data) {
+        // Handle validation errors
+        const errors = error.response.data;
+        if (typeof errors === 'object') {
+          errorMessage = Object.values(errors).flat().join(', ');
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Error', errorMessage);
     } finally {
       setIsSubmitting(false);
     }

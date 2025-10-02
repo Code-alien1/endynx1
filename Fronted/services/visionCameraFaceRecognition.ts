@@ -1,5 +1,7 @@
 import { Face } from 'vision-camera-face-detector';
 import * as FileSystem from 'expo-file-system';
+// @ts-ignore - documentDirectory exists but may not be in type definitions
+const { documentDirectory } = FileSystem;
 import { Alert } from 'react-native';
 
 // Extended Face interface to handle optional landmarks and confidence
@@ -234,8 +236,8 @@ class VisionCameraFaceRecognitionService {
    */
   async compareFaces(encoding1: string, encoding2: string): Promise<FaceComparisonResult> {
     try {
-      const face1 = JSON.parse(Buffer.from(encoding1, 'base64').toString());
-      const face2 = JSON.parse(Buffer.from(encoding2, 'base64').toString());
+      const face1 = JSON.parse(atob(encoding1));
+      const face2 = JSON.parse(atob(encoding2));
 
       // Check encoding version compatibility
       if (face1.version !== face2.version) {
@@ -370,7 +372,7 @@ class VisionCameraFaceRecognitionService {
     try {
       const timestamp = Date.now();
       const fileName = `face_${userId}_${timestamp}.jpg`;
-      const directory = `${FileSystem.documentDirectory}faces/`;
+      const directory = `${documentDirectory}faces/`;
       
       // Create directory if it doesn't exist
       const dirInfo = await FileSystem.getInfoAsync(directory);

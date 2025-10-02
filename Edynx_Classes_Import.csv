@@ -1,0 +1,125 @@
+Package,Class,Attribute,Type,Visibility,Constraint,Description
+User Management,User,id,UUID,public,PK,Primary key identifier
+User Management,User,email,String,public,unique,User email address
+User Management,User,username,String,public,,Username for login
+User Management,User,first_name,String,public,,User first name
+User Management,User,last_name,String,public,,User last name
+User Management,User,phone_number,String,public,,Contact phone number
+User Management,User,role,String,public,"student,parent,teacher,mentor,administration,superadmin",User role in system
+User Management,User,is_active,Boolean,public,,Account status
+User Management,User,created_at,DateTime,public,,Account creation timestamp
+User Management,User,updated_at,DateTime,public,,Last update timestamp
+User Management,User,profile_picture,ImageField,public,,Profile image
+User Management,User,date_of_birth,Date,public,,Birth date
+User Management,User,address,Text,public,,Physical address
+User Management,User,student_id,String,public,unique,Student identifier
+User Management,User,level,Integer,public,"1,2,3",Student level
+User Management,User,class_name,String,public,,Student class
+User Management,User,parent,FK(User),public,,Parent reference
+User Management,User,teacher_id,String,public,unique,Teacher identifier
+User Management,User,subject_taught,String,public,,Teaching subject
+User Management,User,department,String,public,,Department
+User Management,User,mentor_id,String,public,unique,Mentor identifier
+User Management,User,rating,Decimal,public,,Mentor rating
+User Management,User,admin_id,String,public,unique,Admin identifier
+User Management,User,position,String,public,,Admin position
+User Management,User,face_encoding,Text,public,,Face recognition data
+User Management,User,face_image,ImageField,public,,Face image
+User Management,UserProfile,user,OneToOne(User),public,,User reference
+User Management,UserProfile,bio,Text,public,,Biography
+User Management,UserProfile,emergency_contact,String,public,,Emergency contact
+User Management,UserProfile,emergency_contact_name,String,public,,Emergency contact name
+User Management,UserProfile,gpa,Decimal,public,,Grade point average
+User Management,UserProfile,academic_year,String,public,,Academic year
+User Management,UserProfile,experience_years,Integer,public,,Years of experience
+User Management,UserProfile,qualifications,Text,public,,Professional qualifications
+User Management,UserProfile,specializations,Text,public,,Areas of specialization
+User Management,UserProfile,created_at,DateTime,public,,Creation timestamp
+User Management,UserProfile,updated_at,DateTime,public,,Update timestamp
+User Management,UserSession,user,FK(User),public,,User reference
+User Management,UserSession,session_key,String,public,unique,Session identifier
+User Management,UserSession,device_info,Text,public,,Device information
+User Management,UserSession,ip_address,GenericIPAddress,public,,IP address
+User Management,UserSession,user_agent,Text,public,,Browser user agent
+User Management,UserSession,is_active,Boolean,public,,Session status
+User Management,UserSession,created_at,DateTime,public,,Session start
+User Management,UserSession,last_activity,DateTime,public,,Last activity
+Attendance System,Class,id,UUID,public,PK,Primary key
+Attendance System,Class,name,String,public,,Class name
+Attendance System,Class,level,Integer,public,"1,2,3",Class level
+Attendance System,Class,teacher,FK(User),public,,Teacher reference
+Attendance System,Class,created_at,DateTime,public,,Creation timestamp
+Attendance System,Class,updated_at,DateTime,public,,Update timestamp
+Attendance System,AttendanceSession,id,UUID,public,PK,Primary key
+Attendance System,AttendanceSession,class_obj,FK(Class),public,,Class reference
+Attendance System,AttendanceSession,session_type,String,public,"morning,afternoon,evening,custom",Session type
+Attendance System,AttendanceSession,date,Date,public,,Session date
+Attendance System,AttendanceSession,start_time,Time,public,,Start time
+Attendance System,AttendanceSession,end_time,Time,public,,End time
+Attendance System,AttendanceSession,is_active,Boolean,public,,Session status
+Attendance System,AttendanceSession,created_by,FK(User),public,,Creator reference
+Attendance System,AttendanceSession,created_at,DateTime,public,,Creation timestamp
+Attendance System,AttendanceSession,updated_at,DateTime,public,,Update timestamp
+Attendance System,Attendance,id,UUID,public,PK,Primary key
+Attendance System,Attendance,student,FK(User),public,,Student reference
+Attendance System,Attendance,session,FK(AttendanceSession),public,,Session reference
+Attendance System,Attendance,status,String,public,"present,absent,late,excused,pending",Attendance status
+Attendance System,Attendance,method,String,public,"face_recognition,qr_code,peer_scan,manual,justification,location_verified,face_and_location",Attendance method
+Attendance System,Attendance,timestamp,DateTime,public,,Attendance timestamp
+Attendance System,Attendance,location,String,public,,Location info
+Attendance System,Attendance,location_data,JSONField,public,,Structured location data
+Attendance System,Attendance,confidence_score,Decimal,public,,Recognition confidence
+Attendance System,Attendance,verified_by,FK(User),public,,Verifier reference
+Attendance System,Attendance,verified_at,DateTime,public,,Verification timestamp
+Attendance System,Attendance,notes,Text,public,,Additional notes
+Attendance System,AbsenceJustification,id,UUID,public,PK,Primary key
+Attendance System,AbsenceJustification,student,FK(User),public,,Student reference
+Attendance System,AbsenceJustification,attendance,OneToOne(Attendance),public,,Attendance reference
+Attendance System,AbsenceJustification,reason,Text,public,,Absence reason
+Attendance System,AbsenceJustification,photo,ImageField,public,,Supporting photo
+Attendance System,AbsenceJustification,status,String,public,"pending,approved,rejected",Review status
+Attendance System,AbsenceJustification,reviewed_by,FK(User),public,,Reviewer reference
+Attendance System,AbsenceJustification,reviewed_at,DateTime,public,,Review timestamp
+Attendance System,AbsenceJustification,review_notes,Text,public,,Review notes
+Attendance System,AbsenceJustification,submitted_at,DateTime,public,,Submission timestamp
+Face Recognition System,FaceRegistration,id,UUID,public,PK,Primary key
+Face Recognition System,FaceRegistration,user,OneToOne(User),public,,User reference
+Face Recognition System,FaceRegistration,auth_method,String,public,"camera,biometric",Authentication method
+Face Recognition System,FaceRegistration,device_type,String,public,"mobile,web,desktop",Device type
+Face Recognition System,FaceRegistration,face_encoding,Text,public,,Face encoding data
+Face Recognition System,FaceRegistration,biometric_id,String,public,,Biometric identifier
+Face Recognition System,FaceRegistration,confidence_score,Float,public,,Registration confidence
+Face Recognition System,FaceRegistration,created_at,DateTime,public,,Creation timestamp
+Face Recognition System,FaceRegistration,updated_at,DateTime,public,,Update timestamp
+Face Recognition System,FaceRegistration,last_authenticated,DateTime,public,,Last auth timestamp
+Face Recognition System,FaceRegistration,registration_ip,GenericIPAddress,public,,Registration IP
+Face Recognition System,FaceRegistration,user_agent,Text,public,,User agent
+Face Recognition System,FaceRecognitionAttempt,id,UUID,public,PK,Primary key
+Face Recognition System,FaceRecognitionAttempt,user,FK(User),public,,User reference
+Face Recognition System,FaceRecognitionAttempt,attempt_type,String,public,"authentication,registration,update",Attempt type
+Face Recognition System,FaceRecognitionAttempt,result,String,public,"success,failed,no_face,multiple_faces,low_quality,no_match,error",Attempt result
+Face Recognition System,FaceRecognitionAttempt,confidence_score,Float,public,,Recognition confidence
+Face Recognition System,FaceRecognitionAttempt,ip_address,GenericIPAddress,public,,Client IP
+Face Recognition System,FaceRecognitionAttempt,user_agent,Text,public,,User agent
+Face Recognition System,FaceRecognitionAttempt,device_info,Text,public,,Device information
+Face Recognition System,FaceRecognitionAttempt,processing_time,Float,public,,Processing duration
+Face Recognition System,FaceRecognitionAttempt,timestamp,DateTime,public,,Attempt timestamp
+Face Recognition System,FaceRecognitionAttempt,error_message,Text,public,,Error details
+Chat System,ChatRoom,student,FK(User),public,,Student reference
+Chat System,ChatRoom,mentor,FK(User),public,,Mentor reference
+Chat System,ChatRoom,created_at,DateTime,public,,Creation timestamp
+Chat System,ChatRoom,updated_at,DateTime,public,,Update timestamp
+Chat System,ChatRoom,is_active,Boolean,public,,Room status
+Chat System,Message,chat_room,FK(ChatRoom),public,,Chat room reference
+Chat System,Message,sender,FK(User),public,,Message sender
+Chat System,Message,content,Text,public,,Message content
+Chat System,Message,timestamp,DateTime,public,,Message timestamp
+Chat System,Message,is_read,Boolean,public,,Read status
+Chat System,Message,message_type,String,public,"text,image,file",Message type
+Chat System,Message,attachment,FileField,public,,File attachment
+Chat System,MentorAssignment,student,FK(User),public,,Student reference
+Chat System,MentorAssignment,mentor,FK(User),public,,Mentor reference
+Chat System,MentorAssignment,assigned_by,FK(User),public,,Assigner reference
+Chat System,MentorAssignment,assigned_at,DateTime,public,,Assignment timestamp
+Chat System,MentorAssignment,is_active,Boolean,public,,Assignment status
+Chat System,MentorAssignment,notes,Text,public,,Assignment notes

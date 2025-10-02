@@ -14,8 +14,10 @@ import {
 } from 'react-native';
 // import { Picker } from '@react-native-picker/picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as LocalAuthentication from 'expo-local-authentication';
+import * as Location from 'expo-location';
 import AppBackground from '../../components/AppBackground';
-import ExpoCameraFaceAuth from '../../components/ExpoCameraFaceAuth';
+import BiometricFaceAuth from '../../components/BiometricFaceAuth';
 import { COLORS } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
 import apiService, { AttendanceSession, AttendanceRecord } from '../../services/api';
@@ -38,22 +40,50 @@ export default function AttendanceScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState('');
   const [studentAttendanceList, setStudentAttendanceList] = useState<any[]>([]);
-  // Tick state to re-render countdown timers
+  const [filteredStudentList, setFilteredStudentList] = useState<any[]>([]);
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState<any>(null);
   const [tick, setTick] = useState(0);
-  // Record detail modal state
   const [showRecordDetail, setShowRecordDetail] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [locationPermission, setLocationPermission] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
+  const [isMarkingAttendance, setIsMarkingAttendance] = useState(false);
   // Web-only dropdown state for session type
   const [showSessionTypeDropdown, setShowSessionTypeDropdown] = useState(false);
-  const [sessionForm, setSessionForm] = useState({
-    classId: '',
-    className: '',
-    subject: 'General',
-    sessionType: 'morning',
-    date: new Date().toISOString().split('T')[0],
-    startTime: '09:00',
-    endTime: '10:00',
-    location: ''
+  // Helper function to get current time + 5 minutes for default start time
+  const getDefaultTimes = () => {
+    const now = new Date();
+    const startTime = new Date(now.getTime() + 5 * 60000); // 5 minutes from now
+    const endTime = new Date(now.getTime() + 65 * 60000); // 1 hour 5 minutes from now
+    
+    const formatTime = (date: Date) => {
+      return date.toTimeString().slice(0, 5); // HH:MM format
+    };
+    
+    return {
+      startTime: formatTime(startTime),
+      endTime: formatTime(endTime)
+    };
+  };
+
+  const [sessionForm, setSessionForm] = useState(() => {
+    const defaultTimes = getDefaultTimes();
+    const now = new Date();
+    const localDate = now.getFullYear() + '-' + 
+                      String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+                      String(now.getDate()).padStart(2, '0');
+    return {
+      classId: '',
+      className: '',
+      subject: 'General',
+      sessionType: 'morning',
+      date: localDate,
+      startTime: defaultTimes.startTime,
+      endTime: defaultTimes.endTime,
+      location: ''
+    };
   });
 
   if (!user) return null;
@@ -62,31 +92,51 @@ export default function AttendanceScreen() {
 
   useEffect(() => {
     loadAttendanceData();
-  }, [user]);
+    initializeBiometric();
+    initializeLocation();
+  }, []);
+
+  // Auto-refresh effect for real-time updates
+  useEffect(() => {
+    if ((user.role === 'teacher' || user.role === 'administration') && selectedClass) {
+      console.log('Starting auto-refresh for class:', selectedClass);
+      startAutoRefresh();
+    } else {
+      stopAutoRefresh();
+    }
+
+    // Cleanup on unmount
+    return () => {
+      stopAutoRefresh();
+    };
+  }, [selectedClass, user.role]);
+
+  // Cleanup interval on component unmount
+  useEffect(() => {
+    return () => {
+      stopAutoRefresh();
+    };
+  }, []);
 
   useEffect(() => {
-    // Update current time every second for countdown timers
+    // Update current time every second for smooth countdown timers
     const timer = setInterval(() => {
       setCurrentTime(new Date());
       setTick(prev => prev + 1); // Force re-render for countdown timers
-    }, 1000);
+    }, 1000); // Update every second for fluid countdown
 
     return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
-    // Auto-refresh data every 30 seconds to keep attendance lists updated
+    // Auto-refresh data every 2 minutes to keep attendance lists updated (reduced frequency)
     const refreshTimer = setInterval(() => {
       loadAttendanceData();
-    }, 30000);
+    }, 120000); // Changed from 30000ms to 120000ms (2 minutes)
     return () => clearInterval(refreshTimer);
   }, []);
 
-  // Lightweight tick each second to refresh countdown UI
-  useEffect(() => {
-    const t = setInterval(() => setTick((v) => v + 1), 1000);
-    return () => clearInterval(t);
-  }, []);
+  // Removed duplicate tick timer - already handled above with currentTime update
 
   const loadAttendanceData = async () => {
     try {
@@ -104,14 +154,8 @@ export default function AttendanceScreen() {
         console.log('Loading predefined classes for teacher/admin...');
         promises.push(apiService.getPredefinedClasses().catch(err => {
           console.error('Failed to load predefined classes:', err);
-          // Return mock classes for testing if API fails
-          return { 
-            classes: [
-              { id: '1', label: 'BA1B', value: 'ba1b-uuid', name: 'BA1B' },
-              { id: '2', label: 'BA2A', value: 'ba2a-uuid', name: 'BA2A' },
-              { id: '3', label: 'CS1A', value: 'cs1a-uuid', name: 'CS1A' }
-            ]
-          };
+          // Return empty classes if API fails
+          return { classes: [] };
         }));
       }
       
@@ -124,38 +168,9 @@ export default function AttendanceScreen() {
         console.log('Paginated response - extracted sessions from results array');
         let allSessions: AttendanceSession[] = results[0].results;
         
-        // If no sessions from API, create mock sessions for testing
+        // No mock sessions - show empty state when no sessions available
         if (allSessions.length === 0) {
-          console.log('No sessions from API, creating mock sessions for testing');
-          const today = new Date().toISOString().split('T')[0];
-          allSessions = [
-            {
-              id: 'mock-session-1',
-              class_name: user.class_name || 'BA1B',
-              class_obj: 'mock-class-uuid-1',
-              session_type: 'morning',
-              date: today,
-              start_time: '09:00',
-              end_time: '10:00',
-              is_active: true,
-              attendance_count: 0,
-              total_students: 25,
-              created_at: new Date().toISOString()
-            },
-            {
-              id: 'mock-session-2', 
-              class_name: user.class_name || 'BA1B',
-              class_obj: 'mock-class-uuid-2',
-              session_type: 'afternoon',
-              date: today,
-              start_time: '10:30',
-              end_time: '11:30',
-              is_active: true,
-              attendance_count: 0,
-              total_students: 25,
-              created_at: new Date().toISOString()
-            }
-          ];
+          console.log('No sessions from API - showing empty state');
         }
         
         console.log('Formatted sessions:', allSessions.length);
@@ -163,38 +178,9 @@ export default function AttendanceScreen() {
       } else if (Array.isArray(results[0])) {
         let allSessions: AttendanceSession[] = results[0];
         
-        // If no sessions from API, create mock sessions for testing
+        // No mock sessions - show empty state when no sessions available
         if (allSessions.length === 0) {
-          console.log('No sessions from API, creating mock sessions for testing');
-          const today = new Date().toISOString().split('T')[0];
-          allSessions = [
-            {
-              id: 'mock-session-1',
-              class_name: user.class_name || 'BA1B',
-              class_obj: 'mock-class-uuid-1',
-              session_type: 'morning',
-              date: today,
-              start_time: '09:00',
-              end_time: '10:00',
-              is_active: true,
-              attendance_count: 0,
-              total_students: 25,
-              created_at: new Date().toISOString()
-            },
-            {
-              id: 'mock-session-2', 
-              class_name: user.class_name || 'BA1B',
-              class_obj: 'mock-class-uuid-2',
-              session_type: 'afternoon',
-              date: today,
-              start_time: '10:30',
-              end_time: '11:30',
-              is_active: true,
-              attendance_count: 0,
-              total_students: 25,
-              created_at: new Date().toISOString()
-            }
-          ];
+          console.log('No sessions from API - showing empty state');
         }
         
         console.log('Formatted sessions:', allSessions.length);
@@ -247,14 +233,8 @@ export default function AttendanceScreen() {
             // Fallback: try direct API call
             console.log('No classes in promise results, trying direct API call...');
             const classesResponse = await apiService.getPredefinedClasses().catch(err => {
-              console.error('Direct API call failed, using mock classes:', err);
-              return { 
-                classes: [
-                  { id: '1', label: 'BA1B', value: 'ba1b-uuid', name: 'BA1B' },
-                  { id: '2', label: 'BA2A', value: 'ba2a-uuid', name: 'BA2A' },
-                  { id: '3', label: 'CS1A', value: 'cs1a-uuid', name: 'CS1A' }
-                ]
-              };
+              console.error('Direct API call failed:', err);
+              return { classes: [] };
             });
             
             if (classesResponse && classesResponse.classes) {
@@ -266,14 +246,9 @@ export default function AttendanceScreen() {
           setClasses(classesArray);
         } catch (classError) {
           console.error('Error loading classes:', classError);
-          // Set mock classes as final fallback
-          const mockClasses = [
-            { id: '1', label: 'BA1B', value: 'ba1b-uuid', name: 'BA1B' },
-            { id: '2', label: 'BA2A', value: 'ba2a-uuid', name: 'BA2A' },
-            { id: '3', label: 'CS1A', value: 'cs1a-uuid', name: 'CS1A' }
-          ];
-          console.log('Using mock classes as final fallback:', mockClasses);
-          setClasses(mockClasses);
+          // Set empty classes if all API calls fail
+          console.log('All class loading attempts failed - showing empty classes');
+          setClasses([]);
         }
       }
     } catch (error) {
@@ -290,33 +265,132 @@ export default function AttendanceScreen() {
       return;
     }
     
-    console.log('Loading student attendance for class:', className);
+    console.log('Loading real-time student attendance for class:', className);
     setLoading(true);
     setSelectedClass(className);
     
     try {
-      // Try to get real data from API first
-      const data = await apiService.getAttendanceRecords();
-      console.log('Student attendance data received:', data);
+      console.log('Fetching real-time attendance data for class:', className);
       
-      if (data && Array.isArray(data) && data.length > 0) {
-        // Filter for the selected class if needed
-        const classData = data.filter((record: any) => record.class_name === className);
-        setStudentAttendanceList(classData.length > 0 ? classData : data);
-      } else {
-        console.log('No student attendance data found');
-        setStudentAttendanceList([]);
-      }
+      // Get live attendance data from database
+      const [attendanceData, studentsData] = await Promise.all([
+        apiService.getAttendanceRecords().catch((err: any) => {
+          console.warn('getAttendanceRecords failed:', err);
+          return [];
+        }),
+        apiService.get('/users/').then(response => {
+          console.log('Users API response:', response.data);
+          let users = response.data;
+          
+          // Handle paginated response
+          if (users && typeof users === 'object' && users.results) {
+            users = users.results;
+          }
+          
+          // Ensure users is an array
+          if (!Array.isArray(users)) {
+            console.warn('Users data is not an array:', users);
+            return [];
+          }
+          
+          return users.filter((user: any) => user.role === 'student');
+        }).catch((err: any) => {
+          console.warn('getUsers failed, trying alternative:', err);
+          return apiService.get('/edynx-admin/users/').then(response => {
+            console.log('Alternative users API response:', response.data);
+            let users = response.data;
+            
+            // Handle paginated response
+            if (users && typeof users === 'object' && users.results) {
+              users = users.results;
+            }
+            
+            // Ensure users is an array
+            if (!Array.isArray(users)) {
+              console.warn('Alternative users data is not an array:', users);
+              return [];
+            }
+            
+            return users.filter((user: any) => user.role === 'student');
+          }).catch(() => []);
+        })
+      ]);
+      
+      console.log('Raw attendance data:', attendanceData);
+      console.log('Students data:', studentsData);
+      
+      // Process and merge attendance with student data
+      const processedData = await processAttendanceData(attendanceData, studentsData, className);
+      
+      console.log('Processed attendance data:', processedData);
+      setStudentAttendanceList(processedData);
+      setFilteredStudentList(processedData);
+      
+      // Update attendance statistics
+      const stats = calculateAttendanceStats(processedData);
+      console.log('Attendance statistics:', stats);
+      
     } catch (error: any) {
-      console.error('Error loading student attendance:', error);
+      console.error('Error loading real-time student attendance:', error);
+      
+      // No mock data - show empty state when API fails
       setStudentAttendanceList([]);
+      setFilteredStudentList([]);
       
       const errorMessage = error.response?.data?.message || error.message || 'Failed to load student attendance data.';
-      Alert.alert('Error', errorMessage);
+      console.warn('API error - showing empty state:', errorMessage);
     } finally {
       setLoading(false);
     }
   };
+
+  const processAttendanceData = async (attendanceRecords: any[], students: any[], className: string) => {
+    const processedData = [];
+    
+    // Get current date for filtering today's attendance
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Filter students by class if possible
+    const classStudents = students.filter(student => 
+      student.class_name === className || 
+      student.className === className ||
+      student.class === className
+    );
+    
+    // Use all students if no class filtering worked
+    const relevantStudents = classStudents.length > 0 ? classStudents : students;
+    
+    for (const student of relevantStudents) {
+      // Find today's attendance record for this student
+      const todayAttendance = attendanceRecords.find(record => 
+        record.student_id === student.id && 
+        record.date === today
+      );
+      
+      const attendanceRecord = {
+        id: student.id,
+        student_id: student.id,
+        student_name: `${student.first_name || ''} ${student.last_name || ''}`.trim(),
+        first_name: student.first_name,
+        last_name: student.last_name,
+        username: student.username,
+        email: student.email,
+        class_name: className,
+        status: todayAttendance ? todayAttendance.status : 'absent',
+        method: todayAttendance ? todayAttendance.method : 'not_marked',
+        timestamp: todayAttendance ? todayAttendance.timestamp : null,
+        confidence_score: todayAttendance ? todayAttendance.confidence_score : null,
+        location: todayAttendance ? todayAttendance.location : null,
+        date: today,
+        marked_at: todayAttendance ? todayAttendance.created_at : null
+      };
+      
+      processedData.push(attendanceRecord);
+    }
+    
+    return processedData;
+  };
+
 
   const handleCreateSession = async () => {
     // For web: if user typed class name but no classId yet, try to resolve from loaded classes
@@ -420,10 +494,16 @@ export default function AttendanceScreen() {
         }
       }
 
+      // Use local date for session creation
+      const now = new Date();
+      const localDate = now.getFullYear() + '-' + 
+                        String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+                        String(now.getDate()).padStart(2, '0');
+      
       const sessionData = {
         class_obj: classId,
         session_type: sessionForm.sessionType,
-        date: new Date().toISOString().split('T')[0],
+        date: localDate,
         start_time: sessionForm.startTime,
         end_time: sessionForm.endTime,
         is_active: true,
@@ -432,16 +512,33 @@ export default function AttendanceScreen() {
       
       console.log('Sending session data:', sessionData);
       const newSession = await apiService.createAttendanceSession(sessionData);
+      console.log('Session created successfully:', newSession);
+      
+      // Check if the newly created session would be considered active
+      if (newSession) {
+        const isNewSessionActive = isSessionActive(newSession);
+        console.log('🔍 Newly created session active check:', {
+          sessionId: newSession.id,
+          className: newSession.class_name,
+          isActive: isNewSessionActive,
+          sessionData: newSession
+        });
+      }
       
       setShowCreateSession(false);
+      const newDefaultTimes = getDefaultTimes();
+      const resetNow = new Date();
+      const resetLocalDate = resetNow.getFullYear() + '-' + 
+                            String(resetNow.getMonth() + 1).padStart(2, '0') + '-' + 
+                            String(resetNow.getDate()).padStart(2, '0');
       setSessionForm({
         classId: '',
         className: '',
         subject: 'General',
         sessionType: 'morning',
-        date: new Date().toISOString().split('T')[0],
-        startTime: '09:00',
-        endTime: '10:00',
+        date: resetLocalDate,
+        startTime: newDefaultTimes.startTime,
+        endTime: newDefaultTimes.endTime,
         location: ''
       });
       
@@ -487,10 +584,40 @@ export default function AttendanceScreen() {
     }
   };
 
+  const filterStudentList = (studentList: any[], query: string) => {
+    if (!query.trim()) {
+      setFilteredStudentList(studentList);
+      return;
+    }
+
+    const filtered = studentList.filter(student => {
+      const studentName = (student.name || '').toLowerCase();
+      const studentId = (student.id || '').toLowerCase();
+      const status = (student.status || '').toLowerCase();
+      const method = (student.method || '').toLowerCase();
+      const searchTerm = query.toLowerCase();
+
+      return (
+        studentName.includes(searchTerm) ||
+        studentId.includes(searchTerm) ||
+        status.includes(searchTerm) ||
+        method.includes(searchTerm)
+      );
+    });
+
+    setFilteredStudentList(filtered);
+  };
+
+  const handleStudentSearchChange = (query: string) => {
+    setStudentSearchQuery(query);
+    filterStudentList(studentAttendanceList, query);
+  };
+
   const handleClassSelection = (className: string) => {
     console.log('handleClassSelection called with:', className);
     if (className && className.trim()) {
       setSelectedClass(className);
+      setStudentSearchQuery(''); // Clear search when switching classes
       loadStudentAttendance(className);
     } else {
       console.warn('Invalid class name provided to handleClassSelection');
@@ -507,13 +634,134 @@ export default function AttendanceScreen() {
     setShowRegisterFace(true);
   };
 
-  const handleFaceRegisterSuccess = () => {
+  const calculateAttendanceStats = (attendanceList: any[]) => {
+    const stats = {
+      total: attendanceList.length,
+      present: 0,
+      absent: 0,
+      late: 0,
+      excused: 0
+    };
+    
+    attendanceList.forEach(record => {
+      const status = record.status?.toLowerCase() || 'absent';
+      switch (status) {
+        case 'present':
+          stats.present++;
+          break;
+        case 'late':
+          stats.late++;
+          break;
+        case 'excused':
+          stats.excused++;
+          break;
+        default:
+          stats.absent++;
+      }
+    });
+    
+    return stats;
+  };
+
+  const refreshAllAttendanceData = async () => {
+    try {
+      console.log('Refreshing all attendance data...');
+      
+      // Refresh main attendance data
+      await loadAttendanceData();
+      
+      // Refresh student attendance if teacher/admin is viewing a class
+      if ((user.role === 'teacher' || user.role === 'administration') && selectedClass) {
+        await loadStudentAttendance(selectedClass);
+      }
+      
+      console.log('All attendance data refreshed successfully');
+    } catch (error) {
+      console.error('Error refreshing attendance data:', error);
+    }
+  };
+
+  const startAutoRefresh = () => {
+    // Clear existing interval
+    if (autoRefreshInterval) {
+      clearInterval(autoRefreshInterval);
+    }
+    
+    // Start new interval for real-time updates (every 3 minutes)
+    const interval = setInterval(() => {
+      if ((user.role === 'teacher' || user.role === 'administration') && selectedClass) {
+        console.log('Auto-refreshing attendance data...');
+        refreshAllAttendanceData();
+      }
+    }, 180000); // 180 seconds (3 minutes) - further reduced frequency
+    
+    setAutoRefreshInterval(interval);
+  };
+
+  const stopAutoRefresh = () => {
+    if (autoRefreshInterval) {
+      clearInterval(autoRefreshInterval);
+      setAutoRefreshInterval(null);
+    }
+  };
+
+  const notifyAttendanceUpdate = async (userData: any, result: any) => {
+    try {
+      // This could be used to notify other connected users about attendance updates
+      console.log('Attendance update notification:', {
+        student: userData?.first_name,
+        timestamp: new Date().toISOString(),
+        session: selectedSession?.id
+      });
+    } catch (error) {
+      console.error('Error sending attendance notification:', error);
+    }
+  };
+
+  const handleFaceRegistrationSuccess = async () => {
     setShowRegisterFace(false);
-    Alert.alert('Success', 'Face registered successfully! You can now use face recognition for attendance.');
+    Alert.alert('Success', 'Face registered successfully! Updating attendance records...');
+    
+    // Comprehensive refresh for all views
+    await refreshAllAttendanceData();
   };
 
   const isSessionActive = (session: AttendanceSession): boolean => {
-    const now = new Date();
+    const now = currentTime; // Use the state-managed current time for consistency
+    // Use local date, not UTC
+    const today = now.getFullYear() + '-' + 
+                  String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+                  String(now.getDate()).padStart(2, '0');
+    const sessionDateStr = session.date.split('T')[0]; // Handle both date formats
+    
+    // For sessions created today, be flexible with start time but respect end time
+    if (sessionDateStr === today && session.is_active) {
+      const sessionDate = new Date(session.date);
+      const [endHours, endMinutes] = session.end_time.split(':').map(Number);
+      const endTime = new Date(sessionDate);
+      endTime.setHours(endHours, endMinutes, 0, 0);
+      
+      const hasExpired = now > endTime;
+      
+      console.log(`📅 Today's session ${session.id} (${session.class_name}) active check:`, {
+        endTime: endTime.toISOString(),
+        endTimeLocal: endTime.toLocaleString(),
+        now: now.toISOString(),
+        nowLocal: now.toLocaleString(),
+        hasExpired,
+        result: !hasExpired
+      });
+      
+      if (hasExpired) {
+        console.log(`❌ Session ${session.id} has expired`);
+        return false;
+      }
+      
+      console.log(`✅ Session ${session.id} is active (today's session)`);
+      return true;
+    }
+    
+    // For other dates, use normal time checking
     const sessionDate = new Date(session.date);
     const [startHours, startMinutes] = session.start_time.split(':').map(Number);
     const [endHours, endMinutes] = session.end_time.split(':').map(Number);
@@ -524,24 +772,124 @@ export default function AttendanceScreen() {
     const endTime = new Date(sessionDate);
     endTime.setHours(endHours, endMinutes, 0, 0);
     
-    const isWithinTimeWindow = now >= startTime && now <= endTime;
+    // Allow sessions to be active 15 minutes before start time (increased flexibility)
+    const earlyStartTime = new Date(startTime);
+    earlyStartTime.setMinutes(earlyStartTime.getMinutes() - 15);
+    
+    const isWithinTimeWindow = now >= earlyStartTime && now <= endTime;
     const isActive = isWithinTimeWindow && session.is_active;
+    
+    console.log(`🔍 Session ${session.id} (${session.class_name}) active check:`, {
+      sessionDate: session.date,
+      sessionDateStr,
+      today,
+      isTodaysSession: sessionDateStr === today,
+      startTime: startTime.toISOString(),
+      earlyStartTime: earlyStartTime.toISOString(),
+      endTime: endTime.toISOString(),
+      now: now.toISOString(),
+      nowLocal: now.toLocaleString(),
+      startTimeLocal: startTime.toLocaleString(),
+      endTimeLocal: endTime.toLocaleString(),
+      isWithinTimeWindow,
+      sessionIsActive: session.is_active,
+      result: isActive,
+      timeDiffFromStart: (now.getTime() - startTime.getTime()) / 1000 / 60, // minutes
+      timeDiffFromEnd: (endTime.getTime() - now.getTime()) / 1000 / 60 // minutes
+    });
     
     return isActive;
   };
 
-  const handleDeleteSession = async (sessionId: string) => {
+  const initializeBiometric = async () => {
     try {
-      // Check if this is a mock session (cannot be deleted)
-      if (sessionId.startsWith('mock-session-')) {
-        Alert.alert(
-          'Cannot Delete Mock Session',
-          'This is a mock session for testing purposes and cannot be deleted. Create real sessions to test deletion functionality.',
-          [{ text: 'OK' }]
-        );
+      console.log('🔍 Checking biometric availability...');
+      
+      // Check if device has biometric hardware
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      if (!hasHardware) {
+        console.log('❌ No biometric hardware available');
+        setBiometricAvailable(false);
         return;
       }
 
+      // Check if biometrics are enrolled
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      if (!isEnrolled) {
+        console.log('❌ No biometrics enrolled');
+        setBiometricAvailable(false);
+        return;
+      }
+
+      console.log('✅ Biometric authentication available');
+      setBiometricAvailable(true);
+      
+    } catch (error) {
+      console.error('❌ Error checking biometric availability:', error);
+      setBiometricAvailable(false);
+    }
+  };
+
+  const initializeLocation = async () => {
+    try {
+      console.log('📍 Requesting location permissions...');
+      
+      // Request location permissions
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('❌ Location permission denied');
+        setLocationPermission(false);
+        return;
+      }
+
+      console.log('✅ Location permission granted');
+      setLocationPermission(true);
+
+      // Get current location
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+      
+      setCurrentLocation(location);
+      console.log('📍 Current location:', location.coords);
+      
+    } catch (error) {
+      console.error('❌ Error getting location:', error);
+      setLocationPermission(false);
+    }
+  };
+
+  const validateLocation = async (): Promise<boolean> => {
+    try {
+      if (!currentLocation) {
+        console.log('❌ No current location available');
+        return false;
+      }
+
+      console.log('📍 Validating location with backend...');
+      
+      const response = await apiService.post('/attendance/validate-location/', {
+        latitude: currentLocation.coords.latitude,
+        longitude: currentLocation.coords.longitude,
+        accuracy: currentLocation.coords.accuracy,
+      });
+
+      if (response.status === 200) {
+        const data = response.data;
+        console.log('✅ Location validation result:', data);
+        return data.valid || false;
+      } else {
+        console.error('❌ Location validation failed:', response.status);
+        return false;
+      }
+    } catch (error: any) {
+      console.error('❌ Location validation error:', error);
+      return false;
+    }
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    try {
       // Show confirmation dialog
       Alert.alert(
         'Delete Session',
@@ -573,7 +921,7 @@ export default function AttendanceScreen() {
     }
   };
 
-  const handleMarkAttendance = (session: AttendanceSession) => {
+  const handleMarkAttendance = async (session: AttendanceSession) => {
     const sessionIsActive = isSessionActive(session);
     console.log(`handleMarkAttendance - Session ${session.id} active check:`, sessionIsActive);
     
@@ -596,12 +944,190 @@ export default function AttendanceScreen() {
       );
       return;
     }
-    
-    setSelectedSession(session);
-    setShowFaceAuth(true);
+
+    // New integrated biometric + geolocation attendance flow
+    await handleBiometricLocationAttendance(session);
   };
 
-  const handleQuickAttendance = () => {
+  const handleBiometricLocationAttendance = async (session: AttendanceSession) => {
+    if (isMarkingAttendance) return;
+    
+    setIsMarkingAttendance(true);
+    
+    try {
+      console.log('🔐 Starting integrated biometric + location attendance...');
+
+      // Step 1: Check if biometric is available
+      if (!biometricAvailable) {
+        Alert.alert(
+          'Biometric Not Available', 
+          'Biometric authentication is not available on this device. Please use face recognition instead.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Use Face Recognition', 
+              onPress: () => {
+                setSelectedSession(session);
+                setShowFaceAuth(true);
+              }
+            }
+          ]
+        );
+        return;
+      }
+
+      // Step 2: Check location permission and availability
+      if (!locationPermission || !currentLocation) {
+        Alert.alert(
+          'Location Required', 
+          'Location access is required to mark attendance. Please enable location permissions and try again.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Retry', 
+              onPress: async () => {
+                await initializeLocation();
+                if (locationPermission && currentLocation) {
+                  await handleBiometricLocationAttendance(session);
+                }
+              }
+            }
+          ]
+        );
+        return;
+      }
+
+      // Step 3: Validate location first
+      console.log('📍 Validating location...');
+      const locationValid = await validateLocation();
+      if (!locationValid) {
+        Alert.alert(
+          'Location Error', 
+          'You are not within the allowed area to mark attendance. Please make sure you are on campus.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Step 4: Prompt for biometric authentication
+      console.log('🔐 Requesting biometric authentication...');
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Confirm Attendance with Biometrics',
+        fallbackLabel: 'Use Passcode',
+        cancelLabel: 'Cancel',
+        disableDeviceFallback: false,
+      });
+
+      if (!result.success) {
+        console.log('❌ Biometric authentication failed');
+        Alert.alert(
+          'Authentication Failed', 
+          'Biometric authentication failed. Would you like to try face recognition instead?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Use Face Recognition', 
+              onPress: () => {
+                setSelectedSession(session);
+                setShowFaceAuth(true);
+              }
+            }
+          ]
+        );
+        return;
+      }
+
+      console.log('✅ Biometric authentication successful');
+
+      // Step 5: Mark attendance with both biometric and location verification
+      await markAttendanceWithBiometricAndLocation(session);
+
+    } catch (error: any) {
+      console.error('❌ Biometric + location authentication error:', error);
+      Alert.alert(
+        'Error', 
+        error.message || 'An error occurred while marking attendance. Please try again.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Use Face Recognition', 
+            onPress: () => {
+              setSelectedSession(session);
+              setShowFaceAuth(true);
+            }
+          }
+        ]
+      );
+    } finally {
+      setIsMarkingAttendance(false);
+    }
+  };
+
+  const markAttendanceWithBiometricAndLocation = async (session: AttendanceSession) => {
+    try {
+      console.log('📤 Marking attendance with biometric + location...');
+      
+      if (!currentLocation) {
+        throw new Error('Location not available');
+      }
+
+      const attendanceData = {
+        session_id: session.id,
+        biometric_verified: true,
+        location: {
+          latitude: currentLocation.coords.latitude,
+          longitude: currentLocation.coords.longitude,
+          accuracy: currentLocation.coords.accuracy,
+        },
+        timestamp: new Date().toISOString()
+      };
+
+      // Use the existing geolocation + face recognition endpoint
+      const response = await apiService.post('/attendance/mark-with-face-and-location/', attendanceData);
+
+      if (response.status === 200 || response.status === 201) {
+        const data = response.data;
+        console.log('✅ Attendance marked successfully with biometric + location:', data);
+        
+        Alert.alert(
+          'Success!', 
+          `Attendance marked successfully with biometric authentication and location verification!`,
+          [{ 
+            text: 'OK', 
+            onPress: async () => {
+              // Comprehensive refresh for all views
+              await refreshAllAttendanceData();
+            }
+          }]
+        );
+      } else {
+        const errorData = response.data || {};
+        console.error('❌ Failed to mark attendance:', response.status, errorData);
+        
+        Alert.alert(
+          'Failed to Mark Attendance', 
+          errorData.error || errorData.message || `HTTP ${response.status}`
+        );
+      }
+
+    } catch (error: any) {
+      console.error('❌ Attendance marking error:', error);
+      
+      let errorMessage = 'Failed to mark attendance. Please try again.';
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Error', errorMessage);
+    }
+  };
+
+  const handleQuickAttendance = async () => {
     // Find today's active sessions for the student's class
     const today = new Date().toISOString().split('T')[0];
     console.log('Quick attendance - checking for active sessions on:', today);
@@ -631,9 +1157,8 @@ export default function AttendanceScreen() {
     }
     
     if (todaySessions.length === 1) {
-      // If only one session, mark attendance directly
-      setSelectedSession(todaySessions[0]);
-      setShowFaceAuth(true);
+      // If only one session, use the new integrated biometric + location system
+      await handleBiometricLocationAttendance(todaySessions[0]);
     } else {
       // If multiple sessions, show selection
       Alert.alert(
@@ -646,51 +1171,43 @@ export default function AttendanceScreen() {
 
   const handleFaceAuthSuccess = async (userData?: any, faceEncoding?: string, confidenceScore?: number) => {
     try {
+      if (!faceEncoding) {
+        throw new Error('Face encoding is required for attendance marking');
+      }
+
       console.log('API: Marking attendance with face recognition', {
         sessionId: selectedSession?.id,
         endpoint: '/attendance/face-recognition/',
         location: 'Mobile App',
-        faceEncoding: faceEncoding || 'mock_face_encoding',
-        confidenceScore: confidenceScore || 0.95
+        hasValidFaceEncoding: !!faceEncoding,
       });
       
-      // Ensure we have valid face encoding data
-      if (!faceEncoding || faceEncoding === 'mock_face_encoding') {
-        console.warn('No valid face encoding provided, using mock data for testing');
-      }
-      
-      const response = await apiService.markAttendanceWithFaceRecognition(
-        selectedSession!.id,
-        faceEncoding || 'mock_face_encoding',
-        Math.round((confidenceScore || 0.95) * 1000) / 1000,
+      const result = await apiService.markAttendanceWithFaceRecognition(
+        selectedSession?.id || '',
+        faceEncoding,
+        confidenceScore || 0.95,
         'Mobile App'
       );
       
-      console.log('Face recognition attendance response:', response);
-      
-      // Refresh data after successful attendance marking - handle errors separately
-      try {
-        await loadAttendanceData();
-        // Also refresh student attendance list if teacher/admin is viewing a class
-        if ((user.role === 'teacher' || user.role === 'administration') && selectedClass) {
-          await loadStudentAttendance(selectedClass);
-        }
-      } catch (refreshError) {
-        console.error('Failed to refresh attendance data after marking:', refreshError);
-        // Don't show error to user - attendance was marked successfully
+      if (result && result.id) {
+        // Attendance successfully marked
+        Alert.alert(
+          'Attendance Marked!',
+          `Welcome ${userData?.first_name || 'Student'}! Your attendance has been recorded.`,
+          [{
+            text: 'OK',
+            onPress: async () => {
+              setSelectedSession(null);
+              setShowFaceAuth(false);
+              
+              // Comprehensive refresh for all views
+              await refreshAllAttendanceData();
+            }
+          }]
+        );
+      } else {
+        Alert.alert('Error', 'Failed to mark attendance');
       }
-      
-      Alert.alert(
-        'Success!',
-        'Attendance marked successfully with face recognition.',
-        [{ 
-          text: 'OK',
-          onPress: () => {
-            setSelectedSession(null);
-            setShowFaceAuth(false);
-          }
-        }]
-      );
     } catch (error: any) {
       console.error('Face recognition attendance error:', error);
       console.error('Error details:', {
@@ -745,6 +1262,16 @@ export default function AttendanceScreen() {
     endTime.setHours(hours, minutes, 0, 0);
     
     const timeDiff = endTime.getTime() - now.getTime();
+    
+    // Reduced logging frequency to avoid console spam
+    if (Math.floor(now.getTime() / 10000) % 6 === 0) { // Log every minute
+      console.log(`⏰ Time remaining for session ${session.id}:`, {
+        sessionEndTime: session.end_time,
+        endTimeLocal: endTime.toLocaleString(),
+        nowLocal: now.toLocaleString(),
+        timeDiffMinutes: Math.floor(timeDiff / (1000 * 60))
+      });
+    }
     
     if (timeDiff <= 0) {
       return 'Expired';
@@ -816,8 +1343,15 @@ export default function AttendanceScreen() {
               size={24} 
               color={COLORS.warning} 
             />
-            <Text style={styles.countdownText}>{timeRemaining}</Text>
-            <Text style={styles.countdownLabel}>Time Remaining</Text>
+            <Text style={styles.countdownText}>
+              {timeRemaining}
+              {isActive && !timeRemaining.includes('Expired') && (
+                <Text style={{ color: COLORS.success, fontSize: 12 }}> ●</Text>
+              )}
+            </Text>
+            <Text style={styles.countdownLabel}>
+              {isActive && !timeRemaining.includes('Expired') ? 'Live Countdown' : 'Time Remaining'}
+            </Text>
           </View>
         )}
         
@@ -868,7 +1402,7 @@ export default function AttendanceScreen() {
             disabled={!isSessionActive(session) || Boolean(user.class_name && session.class_name !== user.class_name)}
           >
             <MaterialCommunityIcons 
-              name="check-circle" 
+              name={biometricAvailable && locationPermission ? "fingerprint" : "check-circle"}
               size={20} 
               color={(isSessionActive(session) && (!user.class_name || session.class_name === user.class_name)) ? "white" : "#666"} 
             />
@@ -880,7 +1414,9 @@ export default function AttendanceScreen() {
                 ? 'Session Unavailable' 
                 : (user.class_name && session.class_name !== user.class_name)
                   ? 'Not Your Class'
-                  : 'Mark Attendance'
+                  : biometricAvailable && locationPermission
+                    ? 'Mark Attendance (Biometric + Location)'
+                    : 'Mark Attendance (Face Recognition)'
               }
             </Text>
           </TouchableOpacity>
@@ -978,28 +1514,15 @@ export default function AttendanceScreen() {
           <Text style={styles.headerTitle}>Attendance</Text>
           <View style={styles.headerActions}>
             {user.role === 'student' && (
-              <>
-                <TouchableOpacity
-                  style={styles.registerFaceButton}
-                  onPress={() => setShowRegisterFace(true)}
-                >
-                  <MaterialCommunityIcons name="face-recognition" size={20} color="#2ecc71" />
-                  <Text style={styles.registerFaceButtonText}>Register Face</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.registerFaceButton, { backgroundColor: 'rgba(52, 152, 219, 0.1)' }]}
-                  onPress={async () => {
-                    console.log('Debug: Refreshing attendance data...');
-                    await loadAttendanceData();
-                    Alert.alert('Debug', `Loaded ${attendanceRecords.length} attendance records and ${sessions.length} sessions`);
-                  }}
-                >
-                  <MaterialCommunityIcons name="refresh" size={20} color="#3498db" />
-                  <Text style={[styles.registerFaceButtonText, { color: '#3498db' }]}>Debug Refresh</Text>
-                </TouchableOpacity>
-              </>
+              <TouchableOpacity
+                style={styles.registerFaceButton}
+                onPress={() => setShowRegisterFace(true)}
+              >
+                <MaterialCommunityIcons name="face-recognition" size={20} color="#2ecc71" />
+                <Text style={styles.registerFaceButtonText}>Register Face</Text>
+              </TouchableOpacity>
             )}
-            {user.role === 'teacher' && (
+            {(user.role === 'teacher' || user.role === 'administration') && (
               <TouchableOpacity 
                 style={styles.createSessionButton}
                 onPress={() => setShowCreateSession(true)}
@@ -1014,8 +1537,41 @@ export default function AttendanceScreen() {
           </View>
         </View>
 
-        {/* Teacher Class and Subject Selection */}
-        {user.role === 'teacher' && (
+        {/* Attendance Statistics */}
+        {(user.role === 'teacher' || user.role === 'administration') && selectedClass && studentAttendanceList.length > 0 && (
+          <View style={styles.statsContainer}>
+            <View style={styles.statsHeader}>
+              <Text style={styles.statsTitle}>Class Attendance Statistics</Text>
+              {autoRefreshInterval && (
+                <View style={styles.liveIndicator}>
+                  <View style={styles.liveDot} />
+                  <Text style={styles.liveText}>Live</Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.statsRow}>
+              <View style={styles.attendanceStatItem}>
+                <Text style={styles.attendanceStatNumber}>{calculateAttendanceStats(studentAttendanceList).total}</Text>
+                <Text style={styles.attendanceStatLabel}>Total Students</Text>
+              </View>
+              <View style={styles.attendanceStatItem}>
+                <Text style={[styles.attendanceStatNumber, { color: COLORS.primary }]}>{calculateAttendanceStats(studentAttendanceList).present}</Text>
+                <Text style={styles.attendanceStatLabel}>Present</Text>
+              </View>
+              <View style={styles.attendanceStatItem}>
+                <Text style={[styles.attendanceStatNumber, { color: '#e74c3c' }]}>{calculateAttendanceStats(studentAttendanceList).absent}</Text>
+                <Text style={styles.attendanceStatLabel}>Absent</Text>
+              </View>
+              <View style={styles.attendanceStatItem}>
+                <Text style={[styles.attendanceStatNumber, { color: '#f39c12' }]}>{calculateAttendanceStats(studentAttendanceList).late}</Text>
+                <Text style={styles.attendanceStatLabel}>Late</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Teacher/Admin Class and Subject Selection */}
+        {(user.role === 'teacher' || user.role === 'administration') && (
           <View style={styles.teacherControls}>
             <View style={styles.pickerContainer}>
               <Text style={styles.pickerLabel}>Select Class:</Text>
@@ -1113,14 +1669,49 @@ export default function AttendanceScreen() {
                     <Text style={styles.cardTitle}>Attendance</Text>
                   </View>
                   <Text style={styles.cardDescription}>
-                    Mark your presence for today's classes.
+                    Mark your presence for today's classes with {biometricAvailable && locationPermission ? 'biometric authentication and location verification' : 'face recognition'}.
                   </Text>
+                  
+                  {/* Status indicators */}
+                  <View style={styles.statusIndicators}>
+                    <View style={styles.statusItem}>
+                      <View style={[
+                        styles.statusDot, 
+                        { backgroundColor: biometricAvailable ? '#4CAF50' : '#F44336' }
+                      ]} />
+                      <Text style={styles.statusIndicatorText}>
+                        Biometric: {biometricAvailable ? 'Available' : 'Not Available'}
+                      </Text>
+                    </View>
+                    <View style={styles.statusItem}>
+                      <View style={[
+                        styles.statusDot, 
+                        { backgroundColor: locationPermission && currentLocation ? '#4CAF50' : '#F44336' }
+                      ]} />
+                      <Text style={styles.statusIndicatorText}>
+                        Location: {locationPermission && currentLocation ? 'Available' : 'Not Available'}
+                      </Text>
+                    </View>
+                  </View>
                   <TouchableOpacity
-                    style={styles.markAttendanceButton}
+                    style={[
+                      styles.markAttendanceButton,
+                      isMarkingAttendance && { opacity: 0.6 }
+                    ]}
                     onPress={handleQuickAttendance}
+                    disabled={isMarkingAttendance}
                   >
-                    <MaterialCommunityIcons name="check-circle" size={20} color="white" />
-                    <Text style={styles.markAttendanceButtonText}>Mark Attendance</Text>
+                    <MaterialCommunityIcons 
+                      name={biometricAvailable && locationPermission ? "fingerprint" : "check-circle"} 
+                      size={20} 
+                      color="white" 
+                    />
+                    <Text style={styles.markAttendanceButtonText}>
+                      {biometricAvailable && locationPermission 
+                        ? 'Mark Attendance (Biometric + Location)'
+                        : 'Mark Attendance'
+                      }
+                    </Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -1133,8 +1724,77 @@ export default function AttendanceScreen() {
               ) : (
                 <>
                   {(() => {
-                    const activeSessions = sessions.filter(session => isSessionActive(session));
-                    const endedSessions = sessions.filter(session => !isSessionActive(session));
+                    // Get today's date for filtering (use local date, not UTC)
+                    const now = new Date();
+                    const today = now.getFullYear() + '-' + 
+                                  String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+                                  String(now.getDate()).padStart(2, '0');
+                    console.log('📅 Today\'s date for filtering (local):', today);
+                    console.log('📅 Current time:', now.toLocaleString());
+                    console.log('📋 Total sessions available:', sessions.length);
+                    
+                    // Show sessions from today and recent days (last 7 days)
+                    const recentSessions = sessions.filter(session => {
+                      const sessionDate = session.date.split('T')[0];
+                      const sessionDateObj = new Date(sessionDate);
+                      const todayObj = new Date(today);
+                      const daysDiff = Math.floor((todayObj.getTime() - sessionDateObj.getTime()) / (1000 * 60 * 60 * 24));
+                      console.log(`📅 Session ${session.id}: date=${sessionDate}, daysDiff=${daysDiff}, class=${session.class_name}`);
+                      return daysDiff >= 0 && daysDiff <= 7; // Show sessions from last 7 days
+                    });
+                    
+                    console.log('📋 Recent sessions (last 7 days):', recentSessions.length);
+                    
+                    // Separate active and inactive sessions (re-evaluate with current time)
+                    const activeSessions = recentSessions.filter(session => {
+                      const isActive = isSessionActive(session);
+                      // Log categorization only every 30 seconds to reduce spam
+                      if (Math.floor(currentTime.getTime() / 1000) % 30 === 0) {
+                        console.log(`🔍 Session ${session.id} (${session.class_name}) categorization at ${currentTime.toLocaleTimeString()}:`, {
+                          startTime: session.start_time,
+                          endTime: session.end_time,
+                          isActive,
+                          category: isActive ? 'ACTIVE' : 'ENDED',
+                          currentTime: currentTime.toLocaleTimeString()
+                        });
+                      }
+                      return isActive;
+                    });
+                    
+                    const endedSessions = recentSessions.filter(session => !isSessionActive(session));
+                    
+                    // Further categorize ended sessions
+                    const todaySessions = endedSessions.filter(session => {
+                      const sessionDate = session.date.split('T')[0];
+                      return sessionDate === today;
+                    });
+                    
+                    const olderSessions = endedSessions.filter(session => {
+                      const sessionDate = session.date.split('T')[0];
+                      return sessionDate !== today;
+                    });
+                    
+                    console.log(`📊 Session categorization at ${currentTime.toLocaleTimeString()}:`, {
+                      total: recentSessions.length,
+                      active: activeSessions.length,
+                      todaysEnded: todaySessions.length,
+                      older: olderSessions.length,
+                      currentTime: currentTime.toLocaleTimeString(),
+                      activeSessions: activeSessions.map(s => ({ 
+                        id: s.id, 
+                        class: s.class_name, 
+                        time: s.start_time + '-' + s.end_time,
+                        date: s.date.split('T')[0],
+                        timeRemaining: getTimeRemaining(s)
+                      })),
+                      endedSessions: endedSessions.map(s => ({ 
+                        id: s.id, 
+                        class: s.class_name, 
+                        time: s.start_time + '-' + s.end_time,
+                        date: s.date.split('T')[0],
+                        status: 'ENDED'
+                      }))
+                    });
                     
                     return (
                       <>
@@ -1156,20 +1816,51 @@ export default function AttendanceScreen() {
                           </View>
                         )}
                         
-                        {/* Ended Sessions Section */}
-                        {endedSessions.length > 0 && (
+                        {/* Today's Ended Sessions */}
+                        {todaySessions.length > 0 && (
                           <View style={styles.sectionContainer}>
                             <View style={styles.sectionHeader}>
-                              <MaterialCommunityIcons name="clock-end" size={20} color={COLORS['muted-foreground']} />
-                              <Text style={styles.sectionTitle}>Ended Sessions</Text>
-                              <View style={[styles.activeBadge, { backgroundColor: COLORS['muted-foreground'] }]}>
+                              <MaterialCommunityIcons name="calendar-today" size={20} color={COLORS.primary} />
+                              <Text style={styles.sectionTitle}>Today's Sessions</Text>
+                              <View style={[styles.activeBadge, { backgroundColor: COLORS.primary }]}>
                                 <Text style={styles.activeBadgeText}>
-                                  {endedSessions.length}
+                                  {todaySessions.length}
                                 </Text>
                               </View>
                             </View>
                             <View style={styles.sessionGrid}>
-                              {endedSessions.map(renderSessionCard)}
+                              {todaySessions.map(renderSessionCard)}
+                            </View>
+                          </View>
+                        )}
+                        
+                        {/* Recent Sessions Section */}
+                        {olderSessions.length > 0 && (
+                          <View style={styles.sectionContainer}>
+                            <View style={styles.sectionHeader}>
+                              <MaterialCommunityIcons name="clock-end" size={20} color={COLORS['muted-foreground']} />
+                              <Text style={styles.sectionTitle}>Recent Sessions</Text>
+                              <View style={[styles.activeBadge, { backgroundColor: COLORS['muted-foreground'] }]}>
+                                <Text style={styles.activeBadgeText}>
+                                  {olderSessions.length}
+                                </Text>
+                              </View>
+                            </View>
+                            <View style={styles.sessionGrid}>
+                              {olderSessions.map(renderSessionCard)}
+                            </View>
+                          </View>
+                        )}
+                        
+                        {/* Show message if no recent sessions */}
+                        {recentSessions.length === 0 && sessions.length > 0 && (
+                          <View style={styles.infoContainer}>
+                            <MaterialCommunityIcons name="information" size={24} color={COLORS.primary} />
+                            <Text style={styles.infoText}>
+                              All sessions are older than 7 days. Showing {sessions.length} total sessions.
+                            </Text>
+                            <View style={styles.sessionGrid}>
+                              {sessions.slice(0, 5).map(renderSessionCard)}
                             </View>
                           </View>
                         )}
@@ -1236,19 +1927,70 @@ export default function AttendanceScreen() {
                       <View style={styles.attendanceHeader}>
                         <TouchableOpacity 
                           style={styles.backButton}
-                          onPress={() => setSelectedClass('')}
+                          onPress={() => {
+                            setSelectedClass('');
+                            setStudentSearchQuery('');
+                          }}
                         >
                           <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.primary} />
                         </TouchableOpacity>
                         <View style={styles.headerContent}>
                           <Text style={styles.attendanceTitle}>Class {selectedClass}</Text>
                           <Text style={styles.attendanceSubtitle}>
-                            {studentAttendanceList.filter(s => s.status === 'present').length} / {studentAttendanceList.length} Present Today
+                            {filteredStudentList.filter(s => s.status === 'present').length} / {filteredStudentList.length} Present Today
+                            {studentSearchQuery && ` (filtered from ${studentAttendanceList.length} total)`}
                           </Text>
                         </View>
                       </View>
                       
-                      {studentAttendanceList.map((student) => (
+                      {/* Student Search Filter */}
+                      <View style={styles.searchContainer}>
+                        <View style={styles.searchInputContainer}>
+                          <MaterialCommunityIcons name="magnify" size={20} color={COLORS['muted-foreground']} style={styles.searchIcon} />
+                          <TextInput
+                            style={styles.searchInput}
+                            placeholder="Search students by name, ID, status, or method..."
+                            placeholderTextColor={COLORS['muted-foreground']}
+                            value={studentSearchQuery}
+                            onChangeText={handleStudentSearchChange}
+                          />
+                          {studentSearchQuery.length > 0 && (
+                            <TouchableOpacity
+                              style={styles.clearSearchButton}
+                              onPress={() => handleStudentSearchChange('')}
+                            >
+                              <MaterialCommunityIcons name="close" size={20} color={COLORS['muted-foreground']} />
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                        {studentSearchQuery.length > 0 && (
+                          <Text style={styles.searchResultsText}>
+                            {filteredStudentList.length} of {studentAttendanceList.length} students
+                          </Text>
+                        )}
+                      </View>
+                      
+                      {filteredStudentList.length === 0 ? (
+                        <View style={styles.emptyContainer}>
+                          <MaterialCommunityIcons 
+                            name={studentSearchQuery ? "magnify" : "account-group"} 
+                            size={64} 
+                            color={COLORS['muted-foreground']} 
+                          />
+                          <Text style={styles.emptyStateText}>
+                            {studentSearchQuery ? `No students found for "${studentSearchQuery}"` : 'No students found'}
+                          </Text>
+                          {studentSearchQuery && (
+                            <TouchableOpacity 
+                              style={styles.clearSearchButton}
+                              onPress={() => handleStudentSearchChange('')}
+                            >
+                              <Text style={styles.clearSearchText}>Clear search</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      ) : (
+                        filteredStudentList.map((student) => (
                         <View key={student.id} style={styles.studentAttendanceCard}>
                           <View style={styles.studentInfo}>
                             <View style={styles.studentAvatar}>
@@ -1273,7 +2015,8 @@ export default function AttendanceScreen() {
                             <Text style={styles.statusText}>{student.status}</Text>
                           </View>
                         </View>
-                      ))}
+                        ))
+                      )}
                     </View>
                   )}
                 </View>
@@ -1304,23 +2047,23 @@ export default function AttendanceScreen() {
       </View>
 
       {/* Face Registration Modal */}
-      <ExpoCameraFaceAuth
+      <BiometricFaceAuth
         visible={showRegisterFace}
         onClose={() => setShowRegisterFace(false)}
-        onSuccess={handleFaceRegisterSuccess}
+        onSuccess={handleFaceRegistrationSuccess}
         mode="register"
         title="Register Your Face"
-        subtitle="Position your face in the camera to register for attendance"
+        subtitle="Use your device biometric authentication to register for attendance"
       />
 
       {/* Face Authentication Modal for Attendance */}
-      <ExpoCameraFaceAuth
+      <BiometricFaceAuth
         visible={showFaceAuth}
         onClose={() => setShowFaceAuth(false)}
         onSuccess={handleFaceAuthSuccess}
         mode="attendance"
         title="Mark Attendance"
-        subtitle="Use face recognition to mark your attendance"
+        subtitle="Use your device biometric authentication to mark your attendance"
       />
 
       {/* Create Session Modal */}
@@ -1636,6 +2379,50 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  // Search styles
+  searchContainer: {
+    marginBottom: 16,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.card,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: COLORS.foreground,
+    paddingVertical: 8,
+  },
+  clearSearchButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  searchResultsText: {
+    fontSize: 14,
+    color: COLORS['muted-foreground'],
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  clearSearchText: {
+    fontSize: 16,
+    color: COLORS.primary,
+    fontWeight: '500',
+    marginTop: 12,
   },
   header: {
     flexDirection: 'row',
@@ -2465,5 +3252,109 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.foreground,
     fontWeight: '500',
+  },
+  // Statistics Styles
+  statsContainer: {
+    backgroundColor: COLORS.card,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  statsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  statsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.foreground,
+    flex: 1,
+    textAlign: 'center',
+  },
+  liveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(46, 204, 113, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(46, 204, 113, 0.3)',
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#2ecc71',
+    marginRight: 4,
+  },
+  liveText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#2ecc71',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  attendanceStatItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  attendanceStatNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: COLORS.foreground,
+    marginBottom: 4,
+  },
+  attendanceStatLabel: {
+    fontSize: 12,
+    color: COLORS['muted-foreground'],
+    textAlign: 'center',
+  },
+  // Status indicators styles
+  statusIndicators: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 12,
+    paddingHorizontal: 8,
+  },
+  statusItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  statusIndicatorText: {
+    fontSize: 12,
+    color: COLORS['muted-foreground'],
+    flex: 1,
+  },
+  // Info container styles
+  infoContainer: {
+    backgroundColor: COLORS.card,
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+  },
+  infoText: {
+    fontSize: 14,
+    color: COLORS['muted-foreground'],
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 16,
   },
 });

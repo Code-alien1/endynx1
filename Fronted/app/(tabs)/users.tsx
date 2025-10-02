@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { theme } from '../../constants/theme';
+import apiService from '../../services/api';
 
 interface User {
   id: string;
@@ -23,6 +24,16 @@ interface User {
   last_name: string;
   role: 'student' | 'parent' | 'teacher' | 'mentor' | 'administration' | 'superadmin';
   student_class?: string;
+  parent_id?: string;
+  parent_name?: string;
+}
+
+interface ParentAssignment {
+  id: string;
+  parent: User;
+  student: User;
+  assigned_at: string;
+  assigned_by: string;
 }
 
 export default function UsersTab() {
@@ -32,6 +43,10 @@ export default function UsersTab() {
   const [refreshing, setRefreshing] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [showParentAssignModal, setShowParentAssignModal] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<User | null>(null);
+  const [parents, setParents] = useState<User[]>([]);
+  const [students, setStudents] = useState<User[]>([]);
 
   const [userForm, setUserForm] = useState({
     username: '',
@@ -44,57 +59,203 @@ export default function UsersTab() {
   });
 
   const classes = ['BA1A', 'BA1B', 'BA2A', 'BA2B', 'BA3A', 'BA3B'];
-  const roles = ['student', 'teacher', 'parent', 'administration'];
+  const roles = ['student', 'teacher', 'parent', 'mentor', 'administration'];
 
   useEffect(() => {
     loadUsers();
   }, []);
 
+  useEffect(() => {
+    if (users.length > 0) {
+      loadParentsAndStudents();
+    }
+  }, [users]);
+
+  const loadParentsAndStudents = async () => {
+    try {
+      // Load parents
+      const parentUsers = users.filter(u => u.role === 'parent');
+      setParents(parentUsers);
+      
+      // Load students
+      const studentUsers = users.filter(u => u.role === 'student');
+      setStudents(studentUsers);
+    } catch (error) {
+      console.error('Error loading parents and students:', error);
+    }
+  };
+
   const loadUsers = async () => {
     try {
-      // Mock data for now
-      setUsers([
-        {
-          id: '1',
-          username: 'john_doe',
-          email: 'john@example.com',
-          first_name: 'John',
-          last_name: 'Doe',
-          role: 'student',
-          student_class: 'BA1A',
-        },
-        {
-          id: '2',
-          username: 'jane_smith',
-          email: 'jane@example.com',
-          first_name: 'Jane',
-          last_name: 'Smith',
-          role: 'teacher',
-        },
-      ]);
-    } catch (error) {
+      setLoading(true);
+      console.log('Loading users from API...');
+      
+      // Try multiple endpoints to find users
+      let response;
+      let endpoint = '/users/';
+      
+      try {
+        // First check if backend is running with health check
+        await apiService.get('/users/health/');
+        console.log('Backend health check passed');
+        
+        // Try the users list endpoint
+        response = await apiService.get('/users/list/');
+        console.log('API Response from /users/list/:', response);
+      } catch (listError) {
+        console.log('Users list endpoint failed, trying basic /users/:', listError);
+        try {
+          response = await apiService.get('/users/');
+          console.log('API Response from /users/:', response);
+        } catch (basicError) {
+          console.log('Basic users endpoint failed, trying admin endpoint:', basicError);
+          try {
+            response = await apiService.get('/edynx-admin/users/');
+            console.log('API Response from /edynx-admin/users/:', response);
+          } catch (adminError) {
+            console.log('All endpoints failed. Backend may not be running.');
+            throw new Error('Backend server appears to be offline. Please start the Django server.');
+          }
+        }
+      }
+      
+      // Handle both paginated and direct array responses
+      const usersData = response.data?.results || response.data || response;
+      console.log('Users data:', usersData);
+      console.log('Users data type:', typeof usersData);
+      console.log('Is array:', Array.isArray(usersData));
+      
+      if (!usersData) {
+        console.error('No users data received');
+        Alert.alert('Error', 'No data received from server');
+        setUsers([]);
+        return;
+      }
+      
+      if (!Array.isArray(usersData)) {
+        console.error('Users data is not an array:', usersData);
+        Alert.alert('Error', `Invalid response format from server. Received: ${typeof usersData}`);
+        setUsers([]);
+        return;
+      }
+      
+      if (usersData.length === 0) {
+        console.log('No users found in database');
+        Alert.alert('Info', 'No users found in the database');
+        setUsers([]);
+        return;
+      }
+      
+      // Transform API data to match our interface
+      const transformedUsers: User[] = usersData.map((user: any) => ({
+        id: user.id?.toString() || Math.random().toString(),
+        username: user.username || user.email?.split('@')[0] || 'unknown',
+        email: user.email || '',
+        first_name: user.first_name || '',
+        last_name: user.last_name || '',
+        role: user.role || 'student',
+        student_class: user.student_class || user.class_name,
+        parent_id: user.parent_id,
+        parent_name: user.parent_name,
+      }));
+      
+      console.log('Transformed users count:', transformedUsers.length);
+      console.log('Transformed users:', transformedUsers);
+      setUsers(transformedUsers);
+      
+      if (transformedUsers.length > 0) {
+        Alert.alert('Success', `Loaded ${transformedUsers.length} users from database`);
+      }
+      
+    } catch (error: any) {
       console.error('Error loading users:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      
+      let errorMessage = 'Failed to load users from server.';
+      if (error.response) {
+        errorMessage += ` Status: ${error.response.status}`;
+        if (error.response.data) {
+          errorMessage += ` - ${JSON.stringify(error.response.data)}`;
+        }
+      } else if (error.message) {
+        errorMessage += ` Error: ${error.message}`;
+      }
+      
+      Alert.alert('Error', errorMessage);
+      setUsers([]);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleAssignParent = async (parentId: string) => {
+    try {
+      if (!selectedStudent) return;
+      
+      await apiService.post('/users/parent-assignments/', {
+        student_id: selectedStudent.id,
+        parent_id: parentId,
+      });
+      
+      Alert.alert('Success', 'Parent assigned to student successfully');
+      setShowParentAssignModal(false);
+      setSelectedStudent(null);
+      loadUsers();
+    } catch (error) {
+      console.error('Error assigning parent:', error);
+      Alert.alert('Error', 'Failed to assign parent to student');
+    }
+  };
+
+  const openParentAssignModal = (student: User) => {
+    setSelectedStudent(student);
+    setShowParentAssignModal(true);
   };
 
   const handleCreateUser = async () => {
     try {
+      const userData = {
+        username: userForm.username,
+        email: userForm.email,
+        first_name: userForm.first_name,
+        last_name: userForm.last_name,
+        role: userForm.role,
+        password: userForm.password,
+        ...(userForm.role === 'student' && { student_class: userForm.student_class }),
+      };
+
+      await apiService.post('/users/', userData);
       Alert.alert('Success', 'User created successfully');
       setShowUserModal(false);
       resetUserForm();
       loadUsers();
     } catch (error) {
+      console.error('Error creating user:', error);
       Alert.alert('Error', 'Failed to create user');
     }
   };
 
   const handleUpdateUser = async () => {
     try {
+      if (!editingUser) return;
+      
+      const userData = {
+        username: userForm.username,
+        email: userForm.email,
+        first_name: userForm.first_name,
+        last_name: userForm.last_name,
+        role: userForm.role,
+        ...(userForm.role === 'student' && { student_class: userForm.student_class }),
+      };
+
+      await apiService.patch(`/edynx-admin/users/${editingUser.id}/`, userData);
       Alert.alert('Success', 'User updated successfully');
       setShowUserModal(false);
       resetUserForm();
+      setEditingUser(null);
       loadUsers();
     } catch (error) {
+      console.error('Error updating user:', error);
       Alert.alert('Error', 'Failed to update user');
     }
   };
@@ -108,9 +269,15 @@ export default function UsersTab() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            Alert.alert('Success', 'User deleted successfully');
-            loadUsers();
+          onPress: async () => {
+            try {
+              await apiService.delete(`/edynx-admin/users/${userId}/`);
+              Alert.alert('Success', 'User deleted successfully');
+              loadUsers();
+            } catch (error) {
+              console.error('Error deleting user:', error);
+              Alert.alert('Error', 'Failed to delete user');
+            }
           },
         },
       ]
@@ -195,6 +362,14 @@ export default function UsersTab() {
               </View>
             </View>
             <View style={styles.userActions}>
+              {item.role === 'student' && (
+                <TouchableOpacity
+                  style={styles.assignButton}
+                  onPress={() => openParentAssignModal(item)}
+                >
+                  <Ionicons name="people" size={16} color={theme.colors.warning} />
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={styles.editButton}
                 onPress={() => openUserModal(item)}
@@ -211,6 +386,42 @@ export default function UsersTab() {
           </View>
         )}
       />
+
+      {/* Parent Assignment Modal */}
+      <Modal visible={showParentAssignModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              Assign Parent to {selectedStudent?.first_name} {selectedStudent?.last_name}
+            </Text>
+            
+            <Text style={styles.inputLabel}>Select Parent:</Text>
+            <ScrollView style={{ maxHeight: 200 }}>
+              {parents.map((parent) => (
+                <TouchableOpacity
+                  key={parent.id}
+                  style={styles.parentOption}
+                  onPress={() => handleAssignParent(parent.id)}
+                >
+                  <Text style={styles.parentName}>
+                    {parent.first_name} {parent.last_name}
+                  </Text>
+                  <Text style={styles.parentEmail}>{parent.email}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowParentAssignModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* User Modal */}
       <Modal visible={showUserModal} animationType="slide" transparent>
@@ -430,6 +641,10 @@ const styles = StyleSheet.create({
   deleteButton: {
     padding: 8,
   },
+  assignButton: {
+    padding: 8,
+    marginRight: 8,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -541,7 +756,25 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     color: 'white',
-    textAlign: 'center',
+    fontSize: 16,
     fontWeight: '600',
+  },
+  parentOption: {
+    backgroundColor: theme.colors.background,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  parentName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.colors.text,
+  },
+  parentEmail: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 2,
   },
 });

@@ -3,6 +3,7 @@
     "name": "Fronted",
     "slug": "Fronted",
     "version": "1.0.0",
+    "sdkVersion": "54.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "fronted",
@@ -53,7 +54,20 @@
         {
           "cameraPermission": "Allow Edynx to access your camera for face recognition authentication and attendance marking."
         }
-      ]
+      ],
+      [
+        "react-native-permissions",
+        {
+          "iosPermissions": [
+            "Camera",
+            "Microphone",
+            "PhotoLibrary",
+            "FaceID"
+          ]
+        }
+      ],
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

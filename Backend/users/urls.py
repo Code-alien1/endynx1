@@ -4,6 +4,13 @@ from . import views
 app_name = 'users'
 
 urlpatterns = [
+    # Health check endpoint
+    path('health/', views.health_check, name='health-check'),
+    
+    # User list endpoint for admin
+    path('', views.UserListView.as_view(), name='user-list'),
+    path('list/', views.UserListView.as_view(), name='user-list-alt'),
+    
     # Authentication endpoints
     path('register/', views.UserRegistrationView.as_view(), name='register'),
     path('login/', views.UserLoginView.as_view(), name='login'),
@@ -16,7 +23,12 @@ urlpatterns = [
     
     # General user detail endpoint
     path('<uuid:pk>/', views.UserDetailView.as_view(), name='user-detail'),
-    path('<uuid:pk>/progress/', views.StudentProgressView.as_view(), name='user-progress'),
+    path('<uuid:pk>/delete/', views.UserDeleteView.as_view(), name='user-delete'),
+    # Student progress endpoint
+    path('students/<uuid:student_id>/progress/', views.StudentProgressView.as_view(), name='student-progress'),
+    
+    # Parent assignment endpoints
+    path('parent-assignments/', views.ParentAssignmentView.as_view(), name='parent-assignments'),
     
     # Student endpoints
     path('students/', views.StudentListView.as_view(), name='student-list'),

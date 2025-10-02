@@ -21,12 +21,29 @@ export default function LandingPage() {
 
   useEffect(() => {
     console.log('Landing page - Auth state:', { isLoading, isAuthenticated });
+    
+    // Only redirect if we're not loading and user is authenticated
     if (!isLoading && isAuthenticated) {
-      const target = getRoleRoute();
-      console.log('Redirecting authenticated user to:', target);
-      router.replace(target);
+      console.log('User is authenticated, redirecting...');
+      // Add a small delay to ensure Root Layout is fully mounted
+      const timer = setTimeout(() => {
+        const target = getRoleRoute();
+        console.log('Redirecting authenticated user to:', target);
+        
+        // Ensure we're not redirecting to login when user is authenticated
+        if (target !== '/(auth)/login') {
+          router.replace(target);
+        } else {
+          console.log('User authenticated but no role data yet, redirecting to default dashboard');
+          router.replace('/(tabs)/dashboard');
+        }
+      }, 150);
+      
+      return () => clearTimeout(timer);
     } else if (!isLoading && !isAuthenticated) {
       console.log('User not authenticated, staying on landing page');
+    } else if (isLoading) {
+      console.log('Authentication state is loading...');
     }
   }, [isAuthenticated, isLoading, router, getRoleRoute]);
 
